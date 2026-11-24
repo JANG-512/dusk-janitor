@@ -16,6 +16,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 [hidden] { display: none !important; }
 #game { position: relative; width: 100%; height: 100%; overflow: hidden; isolation: isolate; color: var(--text); user-select: none; touch-action: none; }
+#game, #game * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#world, #game button { touch-action: none; }
 #world, .vignette, .hud, .touch-controls, .modal { position: absolute; inset: 0; }
 #world { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 .vignette { pointer-events: none; background: radial-gradient(ellipse at 50% 53%, transparent 44%, #0d0e175e 82%, #0b0a17b5 100%), linear-gradient(180deg, #0e0d19ab 0%, transparent 23%, transparent 75%, #100e1cc4 100%); }

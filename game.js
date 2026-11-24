@@ -1154,6 +1154,19 @@
     stick.y = dir.y * strength;
     ui.stick.firstElementChild.style.transform = 'translate(' + stick.x * 24 + 'px,' + stick.y * 24 + 'px)';
   }
+  // WebKit can still start native selection or zoom during simultaneous play controls.
+  for (const name of ['gesturestart', 'gesturechange', 'selectstart', 'dragstart', 'contextmenu']) {
+    ui.game.addEventListener(name, event => event.preventDefault(), { passive: false });
+  }
+  ui.game.addEventListener('touchstart', event => {
+    if (event.touches.length > 1 || event.target.closest('#world, #stick, #sweep, #dash')) {
+      event.preventDefault();
+    }
+  }, { passive: false });
+  ui.game.addEventListener('touchmove', event => {
+    if (event.touches.length > 1) event.preventDefault();
+  }, { passive: false });
+
   ui.stick.addEventListener('pointerdown', event => {
     if (mode !== 'playing' || stick.id !== null) return;
     stick.id = event.pointerId;

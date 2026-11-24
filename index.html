@@ -11,11 +11,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>황혼의 청소부 · Dusk Janitor</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath fill='%23332735' d='M0 0h26v26H0z'/%3E%3Cpath fill='none' stroke='%23f3cd8a' stroke-width='1.5' d='m14 11 7-8m-5 9-5-3-5 4-2 8 6-1 5-3 1-5ZM7 16l4 3m-2-6 4 3'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
   <script defer src="dungeon.js?v=4"></script>
   <script defer src="art.js?v=7"></script>
   <script defer src="scene.js?v=4"></script>
-  <script defer src="game.js?v=7"></script>
+  <script defer src="game.js?v=8"></script>
 </head>
 <body>
   <main id="game">
@@ -67,7 +67,7 @@
       <div id="message" class="message" aria-live="polite"></div>
 
       <div id="hint" class="hint"><span><kbd>W A S D</kbd> 이동</span><span><kbd>SHIFT</kbd> 회피</span><span><kbd>SPACE / 클릭</kbd> 빗자루 공격</span></div>
-      <div class="loadout" id="loadout" aria-label="청소 도구"></div>
+      <button type="button" class="loadout" id="loadout" aria-label="내 빌드 · 조합 작업실" title="조합 작업실 (B)"></button>
 
       <div class="experience">
         <div class="level-row"><b id="level">Lv. 1</b><span>경험치</span><span id="xp">0 / 8</span></div>

@@ -130,6 +130,7 @@
       xp: 0, need: 7, level: 1, weapons: { broom: 1 }, bonus: {}, timers: {}, shake: 0,
       charges: [], blastKills: 0, catalyst: 0, echo: 0, extension: 0, swings: 0, shield: false, fieldAt: -1, fieldCooldown: 0, hints: 0
     };
+    run.circuits = [role==='alchemist' ? circuit('broom','mine','heavy') : role==='keeper' ? circuit('gem','lure','wide') : circuit('broom','nova','wide')];
     hero.role = role;
     hero.scarf = roles[role].color;
     if (role === 'sweeper') run.echo = 1;
@@ -412,7 +413,7 @@
         sessionStarted = true;
         unlockAudio();
         newRun();
-        announce(data.name + ' · ' + data.start,5);
+        announce(data.name + ' · 장비 칸을 누르면 조합을 설계합니다',5);
       });
       button.className = 'role-card';
       const portrait = document.createElement('canvas');
@@ -480,7 +481,7 @@
     if (mode === 'paused') showPauseMenu();
   });
   function showPauseMenu() {
-    const buttons = [action('계속하기', resume), action('설정',()=>settingsScreen(showPauseMenu),true), action('타이틀로',titleScreen,true)];
+    const buttons = [action('계속하기', resume), action('내 빌드',()=>buildBook(showPauseMenu),true), action('설정',()=>settingsScreen(showPauseMenu),true), action('타이틀로',titleScreen,true)];
     let detail = '빗자루를 내려놓고 잠시 쉬어 갑니다.';
     if (!installed() && installPrompt) {
       buttons.push(action('홈 화면에 설치', async () => {
@@ -503,13 +504,137 @@
     }
   }
 
+  const triggers = {
+    broom:'수동 빗질 적중', dash:'회피 시작', gem:'경험치 수거', kill:'몬스터 처치',
+    blast:'아군 폭발', ally:'동료 공격 적중', spray:'분무기 적중'
+  };
+  const formulas = {
+    nova:['충격파','주변 적 전체에 피해를 줍니다.',3,'#ffcc80'],
+    frost:['서릿가루','주변 적에게 피해를 주고 이동 속도를 55% 낮춥니다.',4,'#a8e8ff'],
+    arc:['연쇄 번개','가까운 적부터 최대 네 마리 사이를 건너뜁니다.',3.6,'#cfacff'],
+    darts:['팔방 분사','여덟 방향으로 관통하는 물방울을 발사합니다.',4,'#90e0d2'],
+    lure:['소용돌이','벽 너머를 제외한 적과 경험치 결정을 발동 지점으로 당깁니다.',3.2,'#b1eed2'],
+    mine:['시한 정화탄','잠시 뒤 폭발해 피해를 주고 주변 오염 통을 점화합니다.',4.6,'#ffa57d'],
+    drain:['생기 환원','주변 적에게 피해를 줍니다. 한 마리라도 맞히면 체력 1을 회복합니다.',9,'#f4acbd']
+  };
+  const styles = { wide:'광역형', fast:'속사형', heavy:'고출력형' };
+  const modules = [
+    {key:'coil',label:'증폭 코일',desc:'두 슬롯의 조합 피해 +1',icon:weaponData.ring.icon,max:3},
+    {key:'lens',label:'확장 렌즈',desc:'두 슬롯의 조합 반경과 탄 비행거리 +15%',icon:weaponData.spray.icon,max:3},
+    {key:'relay',label:'순환 계전기',desc:'두 슬롯의 조합 재사용 시간 10% 단축',icon:weaponData.soap.icon,max:3}
+  ];
+  function circuit(trigger,formula,style) {
+    return {trigger,formula,style,ready:0,count:0};
+  }
+  function specs(slot) {
+    const {style,formula} = slot;
+    return {
+      power: (style === 'heavy' ? 4 : style === 'fast' ? 1 : 2) + (run.bonus.coil ?? 0),
+      radius: Math.round((style === 'wide' ? 72 : 48) * (1 + .15*(run.bonus.lens ?? 0))),
+      delay: formulas[formula][2] * (style === 'heavy' ? 1.45 : style === 'fast' ? .55 : 1) * .9**(run.bonus.relay ?? 0)
+    };
+  }
+  function circuitEvent(trigger,point,sourceSlot=-1) {
+    // Effects may feed a later slot, but never retrigger themselves or an earlier slot.
+    for (let i=sourceSlot+1;i<run.circuits.length;i++) {
+      const slot=run.circuits[i];
+      if (slot.trigger !== trigger || slot.ready > run.time) continue;
+      const {power,radius,delay} = specs(slot);
+      slot.ready = run.time + delay;
+      slot.count++;
+      const color = formulas[slot.formula][3];
+      effects.push({kind:'ring',x:point.x,y:point.y-4,radius,life:.26,full:.26,color});
+      const targets = hostiles().filter(m=>distance(point,m)<=radius && clearLine(point,m));
+      switch (slot.formula) {
+        case 'mine':
+          arm(point,radius,.48,power+1,i);
+          break;
+        case 'darts':
+          for (let ray=0;ray<8;ray++) {
+            const a=ray*Math.PI/4;
+            shots.push({x:point.x,y:point.y,vx:Math.cos(a)*145,vy:Math.sin(a)*145,life:radius/95,
+              strength:power,friendly:true,sourceSlot:i,hits:new Set()});
+          }
+          break;
+        case 'arc': {
+          const struck = new Set();
+          let from = point;
+          for (let hop=0;hop<4;hop++) {
+            const next=nearest(from,hostiles().filter(m=>!struck.has(m) && clearLine(from,m)),radius);
+            if (!next) break;
+            effects.push({kind:'bolt',x:from.x,y:from.y-6,toX:next.x,toY:next.y-6,color,life:.2});
+            damageMonster(next,power,from,true,i);
+            struck.add(next);
+            from=next;
+          }
+          break;
+        }
+        default:
+          for (const m of targets) {
+            if (slot.formula==='frost') m.chilledUntil=run.time+1.5+power*.25;
+            if (slot.formula==='lure') {
+              const dir=toward(m,point);
+              const steps = Math.min(8,Math.floor(distance(m,point)/4));
+              for(let i=0;i<steps;i++) move(m,dir.x*4,dir.y*4,3);
+            }
+            damageMonster(m,power,point,true,i);
+          }
+          if (slot.formula==='drain' && targets.length) hero.hp=Math.min(hero.max,hero.hp+1);
+          if (slot.formula==='lure') {
+            for (const gem of gems) if(distance(point,gem)<=radius && clearLine(point,gem)) {
+              gem.x=point.x; gem.y=point.y; gem.magnetized=true;
+            }
+          }
+      }
+    }
+  }
+
+  function buildBook(back=resume) {
+    dialog('build','청소 장비','조합 작업실','발동 조건, 효과, 개조 방식을 선택하세요. 첫 슬롯의 폭발·처치로 두 번째 슬롯을 연쇄 발동할 수 있습니다.',[action('완료',back)]);
+    const book=document.createElement('div');
+    book.className='build-book';
+    for(const [i,slot] of run.circuits.entries()) {
+      const field=document.createElement('fieldset');
+      const legend=document.createElement('legend');
+      legend.textContent='조합 슬롯 '+(i+1);
+      field.append(legend);
+      const preview=document.createElement('p');
+      const refresh=()=>{
+        const stats=specs(slot);
+        const prerequisite = {spray:'분무기 탄환이 필요합니다. ', ally:'임시 동료가 필요합니다. ', blast:'오염 통, 기폭제 또는 앞 슬롯의 정화탄 폭발로 발동합니다. '}[slot.trigger] ?? '';
+        preview.textContent=prerequisite + formulas[slot.formula][1]+' 피해 '+stats.power+' · 반경 '+stats.radius+' · 재사용 '+stats.delay.toFixed(1)+'초 · 발동 '+slot.count+'회';
+      };
+      for(const [key,label,items] of [['trigger','조건',triggers],['formula','효과',formulas],['style','개조',styles]]) {
+        const row=document.createElement('label');
+        row.textContent=label;
+        const select=document.createElement('select');
+        for(const [value,text] of Object.entries(items)) select.add(new Option(Array.isArray(text)?text[0]:text,value));
+        select.value=slot[key];
+        select.onchange=()=>{slot[key]=select.value;refresh();};
+        row.append(select);
+        field.append(row);
+      }
+      refresh();
+      field.append(preview);
+      book.append(field);
+    }
+    const inventory=document.createElement('p');
+    const owned=[...Object.entries(weaponData).map(([key,data])=>[data.label,run.weapons[key]]),
+      ...[...utility,...modules].map(data=>[data.label,run.bonus[data.key]]),
+      ...roles[role].paths.map(([name],i)=>[name,run.bonus[role+i]])];
+    inventory.textContent=(run.level<4?'Lv.4에서 두 번째 슬롯 개방 · ':'')+owned.filter(([,lv])=>lv).map(([name,lv])=>name+' '+lv).join(' · ');
+    book.append(inventory);
+    ui['dialog-actions'].prepend(book);
+  }
+
   function levelUp() {
     run.xp -= run.need;
     run.level++;
+    if(run.level===4) run.circuits.push(circuit('dash','frost','fast'));
     run.need = Math.floor(6 + run.level * 2.7);
     const tools = Object.entries(weaponData).filter(([key]) => (run.weapons[key] ?? 0) < 5)
       .map(([key, data]) => ({ ...data, key, weapon: true }));
-    const passives = utility.filter(({ key, max }) => (run.bonus[key] ?? 0) < max);
+    const passives = [...utility,...modules].filter(({ key, max }) => (run.bonus[key] ?? 0) < max);
     const available = [...tools, ...passives];
     const unowned = tools.filter(({ key }) => !run.weapons[key]);
     const specialty = roles[role].paths.map(([label,desc],i)=>({
@@ -519,7 +644,9 @@
     // On milestone levels, offer both branches so the player can deliberately specialize.
     if (run.level % 3 === 0 && specialty.length === 2) options.push(specialty.find(item=>item!==options[0]));
     if (unowned.length) options.push(unowned[Math.floor(Math.random() * unowned.length)]);
-    while (options.length < 3 && available.some(item => !options.includes(item))) {
+    const upgrades=modules.filter(item=>(run.bonus[item.key]??0)<item.max);
+    if(upgrades.length) options.push(upgrades[Math.floor(Math.random()*upgrades.length)]);
+    while (options.length < 4 && available.some(item => !options.includes(item))) {
       const pool = available.filter(item => !options.includes(item));
       options.push(pool[Math.floor(Math.random() * pool.length)]);
     }
@@ -529,7 +656,7 @@
     }
     tone(540, 720, .15);
     tone(740, 1000, .18, 'triangle', .12);
-    dialog('upgrade', 'LEVEL ' + run.level, '청소 도구를 강화하세요', '하나를 선택하면 탐험을 이어갑니다.', options.map(option => {
+    dialog('upgrade', 'LEVEL ' + run.level, '청소 도구를 강화하세요', run.level===4 ? '두 번째 조합 슬롯 개방! 장비 칸에서 두 조합을 편집하세요.' : '하나를 선택하면 탐험을 이어갑니다.', options.map(option => {
       const button = document.createElement('button');
       const holder = option.weapon ? run.weapons : run.bonus;
       const next = (holder[option.key] ?? 0) + 1;
@@ -618,8 +745,8 @@
   }
 
   // Both hazards and player-triggered charges use the same telegraph and blast radius.
-  function arm(point, radius, delay, damage) {
-    run.charges.push({x:point.x, y:point.y, radius, delay, damage});
+  function arm(point, radius, delay, damage, sourceSlot=-1) {
+    run.charges.push({x:point.x, y:point.y, radius, delay, damage, sourceSlot});
   }
 
   function updateCharges(dt) {
@@ -642,9 +769,10 @@
         if (distance(hero,c) <= c.radius && clearLine(c,hero)) damageHero();
         continue;
       }
+      circuitEvent('blast',c,c.sourceSlot);
       for (const m of hostiles()) {
         if (distance(m,c) > c.radius || !clearLine(c,m)) continue;
-          damageMonster(m,c.damage,c);
+          damageMonster(m,c.damage,c,true,c.sourceSlot);
           if (m.hp === 0 && run.blastKills < 3) {
             run.blastKills++;
             if (run.blastKills === 3) {
@@ -667,7 +795,7 @@
     burst(keg.x,keg.y-8,'#ffe3a1',8,36);
   }
 
-  function damageMonster(m, amount, origin, player = true) {
+  function damageMonster(m, amount, origin, player = true, sourceSlot = -1) {
     if (m.hp <= 0 || m.friendly || m.fear > 0) return;
     m.hp = Math.max(0, m.hp - amount);
     m.flash = .15;
@@ -688,6 +816,7 @@
     m.room.resolved++;
     placeGem(m);
     updateRoomClean(m.room);
+    circuitEvent('kill',m,sourceSlot);
   }
 
   function recruit(m) {
@@ -774,6 +903,7 @@
           primed = false;
         }
         damageMonster(m, 1 + Math.floor(broom / 2), hero);
+        circuitEvent('broom',m);
       }
     }
   }
@@ -849,6 +979,7 @@
         m.cooldown = .84;
         sweep(m, toward(m, target), '#a8ebc3', 26);
         damageMonster(target, 1 + (run.bonus.keeper0 ?? 0), m, false);
+        circuitEvent('ally',target);
       }
       return;
     }
@@ -907,13 +1038,14 @@
         y += dy / d * (12 - d) / 23;
       }
     }
-    const speed = ([38, 30, 44][m.type] + Math.min(13, m.room.tier * 3)) * dt;
+    const speed = ([38, 30, 44][m.type] + Math.min(13, m.room.tier * 3)) * (m.chilledUntil > run.time ? .45 : 1) * dt;
     move(m, x * speed, y * speed, 3);
   }
 
   function dash() {
     if (mode !== 'playing' || hero.dashCooldown > 0) return;
     hero.dash = .2;
+    circuitEvent('dash',hero);
     hero.dashCooldown = .9;
     const aim = movementAim();
     hero.dashDirection = aim.x || aim.y ? vector(aim.x, aim.y) : hero.facing;
@@ -965,7 +1097,8 @@
         for (const m of hostiles()) {
           if (!shot.hits.has(m.id) && distance(shot, m) < 9) {
             shot.hits.add(m.id);
-            damageMonster(m, shot.strength, shot);
+            damageMonster(m, shot.strength, shot,true,shot.sourceSlot);
+            if (shot.sourceSlot === undefined) circuitEvent('spray',m);
           }
         }
       } else if (distance(shot, hero) < 9) {
@@ -981,6 +1114,7 @@
       if (range < 10) {
         run.xp += gem.value;
         gem.value = 0;
+        circuitEvent('gem',hero);
         burst(gem.x, gem.y, '#c0f6c7', 3, 24);
       } else if ((gem.magnetized || range <= radius) && clearLine(gem, hero)) {
         gem.magnetized = true;
@@ -1096,7 +1230,13 @@
     for (const fx of effects) {
       const fade = Math.min(1, fx.life * 5);
       ctx.globalAlpha = fade;
-      if (fx.kind === 'impact' || fx.kind === 'blast') {
+      if (fx.kind === 'bolt') {
+        ctx.strokeStyle=fx.color;
+        ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(fx.x,fx.y);
+        ctx.lineTo((fx.x+fx.toX)/2+3,(fx.y+fx.toY)/2-4);
+        ctx.lineTo(fx.toX,fx.toY);ctx.stroke();
+      } else if (fx.kind === 'impact' || fx.kind === 'blast') {
         const t = 1 - fx.life / fx.full;
         const blast = fx.kind === 'blast';
         if (blast) {
@@ -1274,12 +1414,13 @@
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     if (key === 'Tab' && !ui.modal.hidden) {
-      const items = [...ui['dialog-actions'].querySelectorAll('button,input')];
+      const items = [...ui['dialog-actions'].querySelectorAll('button,input,select')];
       const at = items.indexOf(document.activeElement);
       items[(at + (event.shiftKey ? items.length - 1 : 1)) % items.length].focus();
       event.preventDefault();
     }
-    if (event.target instanceof HTMLInputElement) return;
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+    if (key === 'b' && !event.repeat && mode === 'playing') buildBook();
     if (key === 'e' && !event.repeat) useStation();
     if (!control.has(key)) return;
     if (key === ' ' && event.target instanceof HTMLButtonElement) return;
@@ -1377,6 +1518,7 @@
   });
 
   ui.game.tabIndex = -1;
+  ui.loadout.addEventListener('click',()=>{ if(mode==='playing') buildBook(); });
   ui.interact.addEventListener('click', useStation);
   ui.pause.addEventListener('click', togglePause);
   ui.sound.addEventListener('click', async () => {

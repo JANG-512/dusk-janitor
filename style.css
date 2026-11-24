@@ -202,3 +202,12 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .settings-grid output {text-align:right;font:11px monospace;}
 .modal .dialog {touch-action:pan-y;overscroll-behavior:contain;}
 @media(max-width:480px){.role-card {flex-basis:100%;grid-template-columns:52px 1fr;text-align:left;justify-items:start;} .role-card canvas{width:49px;height:44px;grid-row:span 2;} }
+
+.loadout {pointer-events:auto;padding:0;background:transparent;border:0;}
+.build-book {width:100%;display:grid;gap:8px;text-align:left;}
+.build-book fieldset {margin:0;padding:8px;border:1px solid #786584;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;}
+.build-book legend {color:var(--gold);font-size:13px;}
+.build-book label {display:grid;gap:4px;font-size:11px;color:#dfd0e7;}
+.build-book select {width:100%;min-width:0;padding:5px 2px;color:var(--text);background:#352a40;border:1px solid #826e91;}
+.build-book fieldset p {grid-column:1/-1;margin:4px 0;font-size:12px;}
+.build-book>p {margin:0;font-size:11px;color:var(--mint);}

@@ -45,7 +45,7 @@
       ['무리 훈련','임시 동료의 공격 피해 +1'], ['수호 궤도','비눗방울 접촉 피해 +1']]}
   };
   let role = 'sweeper';
-  const defaults = { sound:false, volume:65, shake:true, damage:true, particles:100, map:true, zoom:100, left:false, sensitivity:100, opacity:85 };
+  const defaults = { auto:false, sound:false, volume:65, shake:true, damage:true, particles:100, map:true, zoom:100, left:false, sensitivity:100, opacity:85 };
   let settings = {...defaults};
   try {
     const saved = JSON.parse(localStorage.getItem('dusk-settings') || '{}');
@@ -120,7 +120,7 @@
     ctx.imageSmoothingEnabled = false;
   }
 
-  function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0]) {
+  function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0], travel = false) {
     dungeon = generateDungeon(seed);
     world = bakeWorld(dungeon);
     navigation = dungeon.grid.map((value, i) => {
@@ -129,21 +129,35 @@
       return feetFree(x, y, 3) ? value : -1;
     });
     currentRoom = dungeon.rooms[0];
-    hero = {
-      x: currentRoom.cx, y: currentRoom.cy + 22, hp: 6, max: 6, moving: false,
-      facing: { x: 0, y: -1 }, invulnerable: 0, dash: 0, dashCooldown: 0
-    };
-    run = {
-      time: 0, kills: 0, allies: 0, streak: 0, mercy: 0, clean: 0, id: 0,
-      xp: 0, need: 7, level: 1, weapons: { broom: 1 }, bonus: {}, timers: {}, shake: 0,
-      charges: [], blastKills: 0, catalyst: 0, echo: 0, extension: 0, swings: 0, shield: false, fieldAt: -1, fieldCooldown: 0, hints: 0
-    };
-    run.circuits = [role==='alchemist' ? circuit('broom','mine','heavy') : role==='keeper' ? circuit('gem','lure','wide') : circuit('broom','nova','wide')];
-    hero.role = role;
-    hero.scarf = roles[role].color;
-    if (role === 'sweeper') run.echo = 1;
-    if (role === 'alchemist') run.catalyst = 1;
-    if (role === 'keeper') run.weapons.soap = 1;
+    if (!travel) {
+      hero = {
+        x: currentRoom.cx, y: currentRoom.cy + 22, hp: 6, max: 6, moving: false,
+        facing: { x: 0, y: -1 }, invulnerable: 0, dash: 0, dashCooldown: 0
+      };
+      run = {
+        time: 0, kills: 0, allies: 0, streak: 0, mercy: 0, clean: 0, id: 0,
+        xp: 0, need: 7, level: 1, weapons: { broom: 1 }, bonus: {}, timers: {}, shake: 0,
+        charges: [], blastKills: 0, catalyst: 0, echo: 0, extension: 0, swings: 0, shield: false, fieldAt: -1, fieldCooldown: 0, hints: 0
+      };
+      run.circuits = [role==='alchemist' ? circuit('broom','mine','heavy') : role==='keeper' ? circuit('gem','lure','wide') : circuit('broom','nova','wide')];
+      hero.role = role;
+      hero.scarf = roles[role].color;
+      if (role === 'sweeper') run.echo = 1;
+      if (role === 'alchemist') run.catalyst = 1;
+      if (role === 'keeper') run.weapons.soap = 1;
+      run.hand = [];
+      run.mirrorUntil = run.fogUntil = 0;
+    } else {
+      hero.x = currentRoom.cx;
+      hero.y = currentRoom.cy + 22;
+      hero.moving = false;
+      hero.dash = 0;
+      hero.invulnerable = 1;
+      run.clean = run.allies = run.streak = run.mercy = 0;
+      run.fieldAt = -1;
+      run.fieldCooldown = 0;
+      run.charges = [];
+    }
     camera = { x: hero.x, y: hero.y };
     monsters = [];
     gems = [];
@@ -274,17 +288,65 @@
     if (run.echo) specials.push('공명 '+(3-run.swings%3)+'회 후');
     if (run.catalyst) specials.push('기폭제 '+(4-run.swings%4)+'회 후');
     if (run.weapons.soap) specials.push('비눗방울 접촉 간격 '+soapInterval+'초/적');
-    const lines = ['공속 '+(1/attackInterval(broomInterval)).toFixed(2)+'회/초',tools.join(' · ')];
+    const lines = [(settings.auto ? '자동' : '수동')+' · 공속 '+(1/attackInterval(broomInterval)).toFixed(2)+'회/초',tools.join(' · ')];
     if (specials.length) lines.push(specials.join(' · '));
     for (const [i,slot] of run.circuits.entries()) {
       lines.push((i+1)+' '+formulas[slot.formula][0]+' '+remaining(slot.ready-run.time));
     }
+    if(run.fogUntil>run.time) lines.push('달안개 '+remaining(run.fogUntil-run.time));
+    if(run.mirrorUntil>run.time) lines.push('반전 '+remaining(run.mirrorUntil-run.time));
     const display = lines.join('\n');
     if (uiState.combatText !== display) ui.combat.textContent = uiState.combatText = display;
   }
 
+  const cardInterval = 12;
+  const deck = [
+    {name:'새벽의 종', kind:'축복', desc:'현재 화면에 보이는 적을 모두 처치합니다. 동료는 보호됩니다.', play(){
+      const {x,y}=viewOrigin();
+      for (const m of monsters.slice()) {
+        if (m.hp<=0 || m.friendly || m.x<x || m.x>=x+canvas.width || m.y<y || m.y>=y+canvas.height) continue;
+        if (run.fogUntil>run.time && distance(hero,m)>95) continue;
+        m.fear=0;
+        damageMonster(m,m.hp,hero,false,-1,'새벽의 종');
+      }
+    }},
+    {name:'접힌 지도', kind:'변화', desc:'새 던전으로 이동합니다. 레벨·장비·체력·카드는 가져가고 방 정화와 동료는 처음부터 시작합니다.', play(){newRun(undefined,true);}},
+    {name:'거울 마을', kind:'변화', desc:'20초 동안 필드와 미니맵이 좌우 반전됩니다. 경험치 +6.', play(){run.mirrorUntil=run.time+20;run.xp+=6;}},
+    {name:'달안개', kind:'저주', desc:'18초 동안 주변만 보입니다. 대가로 경험치 +8.', play(){run.fogUntil=run.time+18;run.xp+=8;}},
+    {name:'샘의 선물', kind:'축복', desc:'체력 3을 회복하고 다음 피해를 한 번 막습니다.', play(){hero.hp=Math.min(hero.max,hero.hp+3);run.shield=true;}},
+    {name:'서리밤', kind:'축복', desc:'이미 출현한 적들의 추격 속도를 8초 동안 낮춥니다.', play(){for(const m of hostiles()) m.chilledUntil=Math.max(m.chilledUntil||0,run.time+8);}},
+    {name:'가시 계약', kind:'저주', desc:'체력을 최대 2 소모하고 경험치 12를 얻습니다. 체력은 최소 1이 남습니다.', play(){hero.hp=Math.max(1,hero.hp-2);run.xp+=12;}},
+    {name:'맑은 바람', kind:'축복', desc:'안개와 필드 반전을 해제하고 회피를 즉시 준비합니다.', play(){run.fogUntil=run.mirrorUntil=0;hero.dashCooldown=0;}}
+  ];
+  function openHand() {
+    if(mode!=='playing') return;
+    const counts=new Map();
+    for(const id of run.hand) counts.set(id,(counts.get(id)||0)+1);
+    const buttons=[...counts].map(([id,count])=>{
+      const card=deck[id];
+      const button=action('',()=>{
+        const index=run.hand.indexOf(id);
+        if(mode!=='cards' || index<0) return;
+        run.hand.splice(index,1);
+        resume();
+        card.play();
+        burst(hero.x,hero.y-8,'#ead6a9',18,45);
+        updateHud();
+        announce(card.name+' 사용',2.5);
+        if (run.xp >= run.need) levelUp();
+      });
+      button.className='choice';
+      button.innerHTML='<b>'+card.name+' ×'+count+'</b><small>'+card.kind+' · '+card.desc+'</small>';
+      return button;
+    });
+    buttons.push(action('닫기',resume,true));
+    dialog('cards','달안개 카드','카드 손패','12마리 처치마다 무작위 카드 한 장. 카드를 선택하면 사용합니다.',buttons);
+  }
+
   function updateHud() {
     updateCombatHud();
+    const handText='카드 '+run.hand.length+' · '+(run.kills%cardInterval)+'/'+cardInterval;
+    if(ui.cards.textContent!==handText) ui.cards.textContent=handText;
     if (uiState.blastKills !== run.blastKills) {
       uiState.blastKills = run.blastKills;
       ui.contract.textContent = run.blastKills === 3 ? '✓ 폭파 의뢰 완료' : '폭파 의뢰 · 폭발로 처치 ' + run.blastKills + '/3';
@@ -461,6 +523,7 @@
   }
   function settingsScreen(back) {
     const groups = [
+      ['공격 방식',[['auto','기본 공격 자동 조준·연사']]],
       ['소리',[['sound','효과음'],['volume','효과음 음량',0,100]]],
       ['화면과 효과',[['zoom','화면 배율',75,130],['map','미니맵'],['shake','화면 흔들림'],['particles','입자 효과 밀도',0,100],['damage','피해 숫자']]],
       ['터치 조작',[['left','오른손 이동 스틱'],['sensitivity','스틱 감도',60,160],['opacity','조작 버튼 불투명도',35,100]]]
@@ -849,10 +912,15 @@
       showFear(m);
     }
     run.kills++;
+    if (run.kills % cardInterval === 0) {
+      const id=Math.floor(Math.random()*deck.length);
+      run.hand.push(id);
+      announce('카드 획득 · '+deck[id].name,3);
+    }
     m.room.resolved++;
     placeGem(m);
     updateRoomClean(m.room);
-    circuitEvent('kill',m,sourceSlot);
+    if(source!=='새벽의 종') circuitEvent('kill',m,sourceSlot);
   }
 
   function recruit(m) {
@@ -951,7 +1019,14 @@
 
   function updateWeapons(dt) {
     for (const key of Object.keys(run.weapons)) run.timers[key] = (run.timers[key] ?? 0) - dt;
-    if (heldAttack && run.timers.broom <= 0) swingHeld();
+    if (run.timers.broom <= 0) {
+      if (heldAttack) swingHeld();
+      else if (settings.auto) {
+        const reach = 59 + 6 * run.weapons.broom + run.extension;
+        const target = nearest(hero,hostiles().filter(m=>clearLine(hero,m)),reach);
+        if (target) swingBroom(toward(hero,target));
+      }
+    }
     const spray = run.weapons.spray;
     const ring = run.weapons.ring;
     const soap = run.weapons.soap;
@@ -1098,7 +1173,8 @@
   function movementAim() {
     const x = Number(keys.has('d') || keys.has('ArrowRight')) - Number(keys.has('a') || keys.has('ArrowLeft'));
     const y = Number(keys.has('s') || keys.has('ArrowDown')) - Number(keys.has('w') || keys.has('ArrowUp'));
-    return x || y ? vector(x, y) : stick;
+    const dir=x || y ? vector(x,y) : stick;
+    return run.mirrorUntil>run.time ? {x:-dir.x,y:dir.y} : dir;
   }
 
   function updateHero(dt) {
@@ -1306,9 +1382,13 @@
         ctx.font = 'bold 9px monospace';
         ctx.strokeStyle = '#2c1e32';
         ctx.lineWidth = 2;
-        ctx.strokeText(fx.text, Math.round(fx.x), Math.round(fx.y));
+        ctx.save();
+        ctx.translate(Math.round(fx.x), Math.round(fx.y));
+        if(run.mirrorUntil>run.time) ctx.scale(-1,1);
+        ctx.strokeText(fx.text,0,0);
         ctx.fillStyle = fx.color;
-        ctx.fillText(fx.text, Math.round(fx.x), Math.round(fx.y));
+        ctx.fillText(fx.text,0,0);
+        ctx.restore();
       } else {
         const progress = 1 - fx.life / fx.full;
         const segments = fx.kind === 'ring' ? 90 : 44;
@@ -1332,7 +1412,7 @@
     const shakeX = Math.sin(run.time * 95) * Number(settings.shake) * run.shake * 14;
     const shakeY = Math.cos(run.time * 128) * Number(settings.shake) * run.shake * 10;
     return {
-      x: Math.round(camera.x - focus.x + shakeX),
+      x: Math.round(camera.x - (run.mirrorUntil>run.time ? canvas.width-focus.x : focus.x) + shakeX),
       y: Math.round(camera.y - focus.y + shakeY)
     };
   }
@@ -1344,6 +1424,9 @@
     const inView = (x, y, pad = 45) => x > left - pad && x < left + w + pad && y > top - pad && y < top + h + pad;
     box(0, 0, w, h, '#191824');
     ctx.save();
+    const mirror=run.mirrorUntil>run.time;
+    ui.map.style.transform=mirror ? 'scaleX(-1)' : '';
+    if (mirror) { ctx.translate(w,0); ctx.scale(-1,1); }
     ctx.translate(-left, -top);
     ctx.drawImage(world, 0, 0);
     const actors = [];
@@ -1443,6 +1526,11 @@
     }
     ctx.globalAlpha = 1;
     drawEffects();
+    if(run.fogUntil>run.time) {
+      const mist=ctx.createRadialGradient(hero.x,hero.y,25,hero.x,hero.y,95);
+      mist.addColorStop(0,'#4a465000');mist.addColorStop(.65,'#686774a8');mist.addColorStop(1,'#555260');
+      ctx.fillStyle=mist;ctx.fillRect(left,top,w,h);
+    }
     ctx.restore();
     if (settings.map) drawMap();
   }
@@ -1464,6 +1552,7 @@
       event.preventDefault();
     }
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+    if (key === 'c' && !event.repeat) openHand();
     if (key === 'b' && !event.repeat && mode === 'playing') buildBook();
     if (key === 'e' && !event.repeat) useStation();
     if (!control.has(key)) return;
@@ -1551,7 +1640,8 @@
     }
     const rect = canvas.getBoundingClientRect();
     const origin = viewOrigin();
-    const x = origin.x + (heldAttack.x - rect.left) * canvas.width / rect.width;
+    const localX=(heldAttack.x-rect.left)*canvas.width/rect.width;
+    const x=origin.x+(run.mirrorUntil>run.time ? canvas.width-localX : localX);
     const y = origin.y + (heldAttack.y - rect.top) * canvas.height / rect.height;
     const aim = toward(hero, { x, y });
     swingBroom(aim.x || aim.y ? aim : hero.facing);
@@ -1578,6 +1668,7 @@
   });
 
   ui.game.tabIndex = -1;
+  ui.cards.addEventListener('click',openHand);
   ui.loadout.addEventListener('click',()=>{ if(mode==='playing') buildBook(); });
   ui.interact.addEventListener('click', useStation);
   ui.pause.addEventListener('click', togglePause);

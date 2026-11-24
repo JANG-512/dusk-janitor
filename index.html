@@ -11,11 +11,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>황혼의 청소부 · Dusk Janitor</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath fill='%23332735' d='M0 0h26v26H0z'/%3E%3Cpath fill='none' stroke='%23f3cd8a' stroke-width='1.5' d='m14 11 7-8m-5 9-5-3-5 4-2 8 6-1 5-3 1-5ZM7 16l4 3m-2-6 4 3'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=10">
   <script defer src="dungeon.js?v=4"></script>
   <script defer src="art.js?v=7"></script>
   <script defer src="scene.js?v=4"></script>
-  <script defer src="game.js?v=9"></script>
+  <script defer src="game.js?v=10"></script>
 </head>
 <body>
   <main id="game">
@@ -60,7 +60,7 @@
         <div class="stat"><span class="mini-icon hostile" aria-hidden="true">◆</span><span>처치</span><b id="kills">0</b></div>
         <div class="stat"><span class="mini-icon friendly" aria-hidden="true">✦</span><span>동료</span><b id="party">0</b></div>
       </div>
-      <div class="contract"><div id="contract"></div><div id="combat" aria-label="전투 상태"></div></div>
+      <div class="contract"><div id="contract"></div><button id="cards" type="button" title="카드 손패 (C)">카드 0</button><div id="combat" aria-label="전투 상태"></div></div>
       <div class="encounter" id="encounter"></div>
 
       <button type="button" id="interact" hidden></button>

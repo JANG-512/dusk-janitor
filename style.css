@@ -213,3 +213,5 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .build-book>p {margin:0;font-size:11px;color:var(--mint);}
 
 #combat {margin-top:3px;max-width:min(47vw,245px);white-space:pre-line;font-variant-numeric:tabular-nums;line-height:1.35;color:#ece1dc;background:#15111b9c;padding:2px 4px;}
+
+#cards {pointer-events:auto;background:#34283e;color:#ffe1a7;border:1px solid #997e85;font-size:11px;padding:4px 8px;margin-top:3px;}

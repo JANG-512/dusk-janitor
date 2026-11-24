@@ -274,6 +274,44 @@ const DuskArt = (() => {
     rect(ctx,x+3,y-18,2,2,Math.floor(time*6)%2 ? '#fff4a7' : '#ee805d');
   }
 
+  function drawTerrain(ctx, patch, time) {
+    const {x,y,rx,ry,kind}=patch;
+    const wave=Math.sin(time*2+x);
+    if(kind==='pool') {
+      pixelEllipse(ctx,x,y,rx,ry,'#716c64',2);
+      pixelEllipse(ctx,x,y-1,rx-2,ry-2,'#345866',2);
+      pixelEllipse(ctx,x+3,y,rx-8,ry-5,'#467783',2);
+      for(let n=0;n<5;n++) {
+        rect(ctx,x-15+n*7+wave,y+(n%3)*4-5,4+n%3,1,'#97c9bd');
+        const stalk=x-18+n*3;
+        rect(ctx,stalk,y-7-n%3,1,7,'#819469');
+        rect(ctx,stalk,y-10-n%3,2,4,'#c79783');
+      }
+    } else if(kind==='wind') {
+      pixelEllipse(ctx,x,y,rx,ry,'#4a5156',2);
+      for(let n=-1;n<=1;n++) {
+        const px=x+n*13;
+        rect(ctx,px-4,y-7,10,13,'#758080');
+        rect(ctx,px-4,y-7,9,2,'#a7a899');
+        for(let k=0;k<4;k++) {
+          const color=wave+n*.3>0 ? '#c9e3bd' : '#9ab8ae';
+          rect(ctx,px+k-2,y-4+k,2,2,color);
+          rect(ctx,px+k-2,y+4-k,2,2,color);
+        }
+      }
+    } else {
+      pixelEllipse(ctx,x,y,rx,ry,'#405748',2);
+      for(let n=0;n<12;n++) {
+        const a=n*2.4;
+        const xx=x+Math.cos(a)*(8+n), yy=y+Math.sin(a)*(4+n*.55);
+        rect(ctx,xx,yy-2,2,5,'#829365');
+        rect(ctx,xx-2,yy-3,5,2,patch.spent?'#8c897c':'#e6b8bc');
+        rect(ctx,xx,yy-5,1,4,patch.spent?'#a19b80':'#f5dca3');
+        if(!patch.spent && n%3===0) rect(ctx,xx+wave*2,yy-7-Math.sin(time+a)*3,2,2,'#eee6a6');
+      }
+    }
+  }
+
   function drawMonster(ctx, monster, time) {
     const { x, y, type, friendly, fear, hp, maxHp, windup } = monster;
     const tone = friendly ? { body: '#477b6b', light: '#89cba3', eye: '#e8ffce' } : monsterTypes[type];
@@ -346,6 +384,29 @@ const DuskArt = (() => {
         rect(ctx,mid-14,base-25,Math.ceil(28*hp/maxHp),2,'#f3af72');
       }
     }
+    if(monster.breed==='prism') {
+      for(const side of [-1,1]) {
+        const wing=mid+side*11;
+        pixelEllipse(ctx,wing,base-13-bob*2,5,6,'#706293',2);
+        rect(ctx,wing-3,base-16-bob*2,5,3,'#ada1dd');
+        rect(ctx,wing-1,base-15-bob*2,2,4,windup>0?'#fff1a7':'#81d0cf');
+      }
+    } else if(monster.breed==='mender') {
+      rect(ctx,mid-8,base-13,16,3,'#648166');
+      for(let n=-1;n<=1;n++) {
+        rect(ctx,mid+n*5-2,base-16-Math.abs(n),4,4,'#91ae84');
+        rect(ctx,mid+n*5,base-18-Math.abs(n),2,4,'#d6d89e');
+      }
+      rect(ctx,mid+7,base-10,2,12,'#7b6559');
+      rect(ctx,mid+6,base-13,4,4,'#a7ebba');
+    } else if(monster.breed==='crab') {
+      pixelEllipse(ctx,mid,base-11,8,5,monster.shell?'#6893a1':'#69555e',2);
+      rect(ctx,mid-5,base-14,8,2,monster.shell?'#d2e7d7':'#927578');
+      for(const side of [-1,1]) {
+        rect(ctx,mid+side*11-2,base-9,5,5,'#bb8268');
+        rect(ctx,mid+side*12,base-11,2,3,'#e0ad83');
+      }
+    }
     if (monster.flash > .075) {
       rect(ctx,mid-4,base-9,8,4,'#fff0cd');
       rect(ctx,mid-2,base-11,4,8,'#fff0cd');
@@ -365,5 +426,5 @@ const DuskArt = (() => {
     }
   }
 
-  return { barriers, buildStain, drawProp, drawHero, drawMonster, drawStation, drawKeg };
+  return { barriers, buildStain, drawProp, drawHero, drawMonster, drawStation, drawKeg, drawTerrain };
 })();

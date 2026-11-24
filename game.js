@@ -165,6 +165,11 @@
     shots = [];
     mode = 'playing';
     for (const room of dungeon.rooms) {
+      const kinds=['pool','wind','bloom'];
+      room.terrain = [
+        {kind:kinds[room.id%3],x:room.cx+42,y:room.cy-16,rx:24,ry:13},
+        {kind:kinds[(room.id+1)%3],x:room.cx-27,y:room.cy+44,rx:24,ry:13}
+      ];
       room.casks = [-1, 1].map(side => ({x: room.cx - 58, y: room.cy + side * 20, used: false}));
       room.station = { x: room.cx + 30, y: room.cy + 24, kind: room.id % 3, used: false };
       for (const core of room.cores) core.sprite = buildStain(core.type, core.seed);
@@ -219,7 +224,16 @@
     });
   }
 
+  function terrainAt(actor) {
+    const room=dungeon.rooms[dungeon.grid[cellAt(actor.x,actor.y)]];
+    return room?.terrain.find(t=>((actor.x-t.x)/t.rx)**2+((actor.y-t.y)/t.ry)**2<=1);
+  }
+
   function move(actor, dx, dy, radius = 4) {
+    const ground=terrainAt(actor);
+    const pace=ground?.kind==='wind' ? 1.35 : ground?.kind==='pool' && actor.type!==1 ? .65 : 1;
+    dx*=pace;
+    dy*=pace;
     if (feetFree(actor.x + dx, actor.y, radius)) actor.x += dx;
     if (feetFree(actor.x, actor.y + dy, radius)) actor.y += dy;
   }
@@ -253,10 +267,11 @@
       const warden = room === dungeon.exit && room.spawned === room.batches && i === 0;
       const spore = !warden && room.spawned >= 2 && i === 0;
       if (warden) announce('종지기 출현 · 바닥의 붉은 종소리를 피하세요', 4);
-      const type = warden ? 2 : spore ? 1 : room.id === 0 && room.spawned === 1 ? (i === 3 ? 1 : 0) : i % 5 === 3 ? 2 : i % 4 === 1 ? 1 : 0;
+      const breed = i===1 ? ['prism','mender','crab'][(room.id+room.spawned-1)%3] : '';
+      const type = breed==='prism' ? 1 : breed==='crab' ? 2 : breed==='mender' ? 0 : warden ? 2 : spore ? 1 : room.id === 0 && room.spawned === 1 ? (i === 3 ? 1 : 0) : i % 5 === 3 ? 2 : i % 4 === 1 ? 1 : 0;
       const maxHp = (warden ? 24 : spore ? 5 : [2, 3, 4][type]) + Math.floor(room.tier / 3);
       monsters.push({
-        id: run.id++, room, x, y, type, warden, spore, specialTimer: 1.8, hp: maxHp, maxHp, fear: 0, friendly: false,
+        id: run.id++, room, x, y, type, warden, spore, breed, shell:breed==='crab', specialTimer: 1.8, hp: maxHp, maxHp, fear: 0, friendly: false,
         cooldown: .65 + Math.random() * .7, windup: 0, recoil: 0, rush: 0, flash: 0, grace: .45,
         aim: { x: 0, y: 0 }, soapHit: 0
       });
@@ -293,6 +308,9 @@
     for (const [i,slot] of run.circuits.entries()) {
       lines.push((i+1)+' '+formulas[slot.formula][0]+' '+remaining(slot.ready-run.time));
     }
+    if(run.curseNoticeUntil>run.time) lines.push('저주 발동 · '+run.curseNotice);
+    const ground=terrainAt(hero);
+    if(ground) lines.push({pool:'갈대 여울 · 감속',wind:'바람 돌길 · 가속',bloom:'반딧불 화단'}[ground.kind]);
     if(run.fogUntil>run.time) lines.push('달안개 '+remaining(run.fogUntil-run.time));
     if(run.mirrorUntil>run.time) lines.push('반전 '+remaining(run.mirrorUntil-run.time));
     const display = lines.join('\n');
@@ -303,15 +321,16 @@
   const deck = [
     {name:'새벽의 종', kind:'축복', desc:'현재 화면에 보이는 적을 모두 처치합니다. 동료는 보호됩니다.', play(){
       const {x,y}=viewOrigin();
-      for (const m of monsters.slice()) {
-        if (m.hp<=0 || m.friendly || m.x<x || m.x>=x+canvas.width || m.y<y || m.y>=y+canvas.height) continue;
-        if (run.fogUntil>run.time && distance(hero,m)>95) continue;
+      const visible = monsters.filter(m => m.hp>0 && !m.friendly &&
+        m.x>=x && m.x<x+canvas.width && m.y>=y && m.y<y+canvas.height &&
+        (run.fogUntil<=run.time || distance(hero,m)<=95));
+      for (const m of visible) {
         m.fear=0;
         damageMonster(m,m.hp,hero,false,-1,'새벽의 종');
       }
     }},
     {name:'접힌 지도', kind:'변화', desc:'새 던전으로 이동합니다. 레벨·장비·체력·카드는 가져가고 방 정화와 동료는 처음부터 시작합니다.', play(){newRun(undefined,true);}},
-    {name:'거울 마을', kind:'변화', desc:'20초 동안 필드와 미니맵이 좌우 반전됩니다. 경험치 +6.', play(){run.mirrorUntil=run.time+20;run.xp+=6;}},
+    {name:'거울 마을', kind:'저주', desc:'20초 동안 필드와 미니맵이 좌우 반전됩니다. 경험치 +6.', play(){run.mirrorUntil=run.time+20;run.xp+=6;}},
     {name:'달안개', kind:'저주', desc:'18초 동안 주변만 보입니다. 대가로 경험치 +8.', play(){run.fogUntil=run.time+18;run.xp+=8;}},
     {name:'샘의 선물', kind:'축복', desc:'체력 3을 회복하고 다음 피해를 한 번 막습니다.', play(){hero.hp=Math.min(hero.max,hero.hp+3);run.shield=true;}},
     {name:'서리밤', kind:'축복', desc:'이미 출현한 적들의 추격 속도를 8초 동안 낮춥니다.', play(){for(const m of hostiles()) m.chilledUntil=Math.max(m.chilledUntil||0,run.time+8);}},
@@ -340,7 +359,7 @@
       return button;
     });
     buttons.push(action('닫기',resume,true));
-    dialog('cards','달안개 카드','카드 손패','12마리 처치마다 무작위 카드 한 장. 카드를 선택하면 사용합니다.',buttons);
+    dialog('cards','달안개 카드','카드 손패','12마리마다 한 장을 뽑습니다. 축복과 지도는 골라 쓰고, 저주는 즉시 발동합니다.',buttons);
   }
 
   function updateHud() {
@@ -890,6 +909,13 @@
 
   function damageMonster(m, amount, origin, player = true, sourceSlot = -1, source = '빗질') {
     if (m.hp <= 0 || m.friendly || m.fear > 0) return;
+    if (m.shell && source!=='새벽의 종') {
+      m.shell=false;
+      m.specialTimer=5;
+      burst(m.x,m.y-8,'#bde1eb',12,54);
+      effects.push({kind:'ring',x:m.x,y:m.y-6,radius:15,full:.3,life:.3,color:'#bde1eb'});
+      return;
+    }
     const lostHp = Math.min(m.hp,amount);
     m.hp -= lostHp;
     m.flash = .15;
@@ -914,8 +940,17 @@
     run.kills++;
     if (run.kills % cardInterval === 0) {
       const id=Math.floor(Math.random()*deck.length);
-      run.hand.push(id);
-      announce('카드 획득 · '+deck[id].name,3);
+      const card=deck[id];
+      if (card.kind==='저주') {
+        card.play();
+        run.curseNotice=card.name;
+        run.curseNoticeUntil=run.time+3;
+        burst(hero.x,hero.y-7,'#df86c5',18,46);
+        tone(230,100,.22);
+      } else {
+        run.hand.push(id);
+        announce('카드 획득 · '+card.name,3);
+      }
     }
     m.room.resolved++;
     placeGem(m);
@@ -1105,6 +1140,22 @@
       return;
     }
     const r = distance(m, hero);
+    if (m.breed==='crab' && !m.shell) {
+      m.specialTimer-=dt;
+      if(m.specialTimer<=0) m.shell=true;
+    }
+    if(m.breed==='mender') {
+      m.specialTimer-=dt;
+      if(m.specialTimer<=0) {
+        const wounded=nearest(m,monsters.filter(other=>other!==m && other.hp>0 && other.hp<other.maxHp && !other.friendly && !other.fear && clearLine(m,other)),68);
+        if(wounded) {
+          wounded.hp=Math.min(wounded.maxHp,wounded.hp+2);
+          effects.push({kind:'bolt',x:m.x,y:m.y-10,toX:wounded.x,toY:wounded.y-8,color:'#acf1c7',life:.4});
+          burst(wounded.x,wounded.y-6,'#acf1c7',7,20);
+        }
+        m.specialTimer=wounded ? 3.8 : .4;
+      }
+    }
     if ((m.spore || m.warden) && r < 120 && clearLine(m,hero)) {
       m.specialTimer -= dt;
       if (m.specialTimer <= 0) {
@@ -1133,7 +1184,12 @@
       if (m.windup <= 0) {
         m.cooldown = [1.05, 1.95, 1.9][m.type];
         if (m.type === 0 && r <= 18 && clearLine(m, hero)) damageHero();
-        if (m.type === 1) shots.push({ room: m.room, x: m.x, y: m.y, friendly: false, vx: m.aim.x * 100, vy: m.aim.y * 100, life: 2.4 });
+        if (m.type === 1) {
+          const aim=Math.atan2(m.aim.y,m.aim.x);
+          for(const offset of (m.breed==='prism' ? [-.28,0,.28] : [0])) {
+            shots.push({room:m.room,x:m.x,y:m.y,friendly:false,vx:Math.cos(aim+offset)*100,vy:Math.sin(aim+offset)*100,life:2.4});
+          }
+        }
         if (m.type === 2) m.rush = .41;
       }
       return;
@@ -1189,6 +1245,13 @@
     } else if (hero.moving) {
       hero.facing = vector(aim.x, aim.y);
       move(hero, aim.x * 107 * dt, aim.y * 107 * dt);
+    }
+    const patch=terrainAt(hero);
+    if (patch?.kind==='bloom' && !patch.spent && hero.hp<hero.max) {
+      patch.spent=true;
+      hero.hp=Math.min(hero.max,hero.hp+2);
+      burst(patch.x,patch.y,'#cdeca2',18,35);
+      announce('반딧불 꽃가루 · 체력 회복');
     }
     const cell = cellAt(hero.x, hero.y);
     const room = dungeon.rooms[dungeon.grid[cell]];
@@ -1448,6 +1511,7 @@
           }
         }
       }
+      for (const feature of room.terrain) DuskArt.drawTerrain(ctx,feature,run.time);
       for (const keg of room.casks) {
         if (!keg.used) actors.push({y:keg.y, paint:() => DuskArt.drawKeg(ctx,keg.x,keg.y,run.time)});
       }

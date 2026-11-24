@@ -38,8 +38,22 @@ const DuskDungeon = (() => {
   const cellKey = ({ gx, gy }) => gy * COLS + gx;
   const tileIndex = (x, y) => y * MAP_W + x;
 
-  function generateDungeon(seed) {
+  const regions = [
+    {name:'달안개 마을', material:'stone'},
+    {name:'황혼 서고', material:'wood', rooms:['대출 홀','서쪽 서가','제본실','필사실','기록 보관소'], floor:['#655047','#74594d','#694f49'], prop:'shelf'},
+    {name:'물비늘 포구', material:'dock', rooms:['나루 광장','그물 시장','염전 길','등대 언덕','뱃사공 골목'], floor:['#496565','#526e70','#587675'], prop:'net'},
+    {name:'잿불 주조소', material:'metal', rooms:['반입 홀','용광로실','단조 작업장','냉각실','주물 창고'], floor:['#505360','#4a4d55','#5d5961'], prop:'furnace'}
+  ];
+
+  function generateDungeon(seed, regionIndex = 0) {
+    const profile = regions[regionIndex % regions.length];
     const random = seeded(seed);
+    const region = {...profile};
+    if (regionIndex >= regions.length) {
+      const place = choice(['은버들','잔별','여울','이슬','솔바람','노을','초승달','흰자작'], random);
+      const site = {stone:'마을', wood:'문서관', dock:'나루', metal:'제련소'};
+      region.name = place + ' ' + site[region.material];
+    }
     const grid = new Int16Array(MAP_W * MAP_H).fill(-1);
     const rooms = [];
     const links = [];
@@ -54,12 +68,13 @@ const DuskDungeon = (() => {
       const h = id === 0 ? 19 : 13 + Math.floor(random() * 6);
       const x = centerX - Math.floor(w / 2);
       const y = centerY - Math.floor(h / 2);
-      const theme = themes[id === 0 ? 0 : 1 + Math.floor(random() * 4)];
+      const variant = id === 0 ? 0 : 1 + Math.floor(random() * 4);
+      const theme = region.rooms ? {...themes[variant], name:region.rooms[variant], floor:region.floor} : themes[variant];
       const room = { ...cell, id, x, y, w, h, centerX, centerY, theme, paths: [], props: [], lamps: [], cores: [], seen: false, state: 'dormant' };
       rooms.push(room);
       cells.set(cellKey(cell), room);
       if (parent) links.push([parent.id, id]);
-      const trim = [0, 1, 2, 3].map(() => random() < .65 ? 2 + Math.floor(random() * 3) : 0);
+      const trim = [0, 1, 2, 3].map(() => region.material !== 'wood' && region.material !== 'metal' && random() < .65 ? 2 + Math.floor(random() * 3) : 0);
       for (let ry = 0; ry < h; ry++) {
         for (let rx = 0; rx < w; rx++) {
           if (rx + ry < trim[0] || w - 1 - rx + ry < trim[1] ||
@@ -101,7 +116,7 @@ const DuskDungeon = (() => {
       const b = rooms[to];
       const horizontal = a.gy === b.gy;
       const wiggle = Math.floor(random() * 5) - 2;
-      const width = random() < .32 ? 4 : 3;
+      const width = region.material === 'wood' ? 3 : region.material === 'metal' ? 5 : random() < .32 ? 4 : 3;
       const path = new Set();
       const bendX = Math.round((a.centerX + b.centerX) / 2) + (horizontal ? wiggle : 0);
       const bendY = Math.round((a.centerY + b.centerY) / 2) + (horizontal ? 0 : wiggle);
@@ -154,14 +169,19 @@ const DuskDungeon = (() => {
         const py = cy + sy * (Math.floor(room.h / 2) - 3) * TILE;
         const accentType = room.theme === themes[1] ? 'fruit' : room.theme === themes[2] ? 'grave' : 'tree';
         const topSprite = room.theme === themes[4] || room.id === 0 ? 'house' : sx < 0 && sy < 0 && room.theme === themes[3] ? 'chapel' : accentType;
-        room.props.push([sy < 0 ? topSprite : accentType, px, py]);
+        let landmark = sy < 0 ? topSprite : accentType;
+        if (region.prop) {
+          const filler = region.material === 'dock' ? 'tree' : 'crate';
+          landmark = random() < .65 || (sx < 0 && sy < 0) ? region.prop : filler;
+        }
+        room.props.push([landmark, px, py]);
         room.props.push(['lamp', px - sx * 22, py - sy * 18]);
         room.lamps.push([px - sx * 22, py - sy * 18 - 10]);
         if (random() < .75) room.props.push([room.theme === themes[2] ? 'grave' : 'crate', px - sx * 34, py + 4]);
         if (random() < .62) room.props.push(['bench', px + sx * 20, py - sy * 22]);
       }
       if (room.id !== exitId) {
-        room.props.push(['well', cx, cy - 38]);
+        room.props.push([region.prop || 'well', cx, cy - 38]);
         room.lamps.push([cx, cy - 47]);
       }
       for (let i = 0; i < 4; i++) {
@@ -175,7 +195,7 @@ const DuskDungeon = (() => {
         });
       }
     }
-    return { seed, grid, rooms, links, exit };
+    return { seed, region, regionIndex, grid, rooms, links, exit };
   }
 
   function cellAt(x, y) {

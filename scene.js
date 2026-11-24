@@ -28,13 +28,25 @@ const DuskScene = (() => {
           continue;
         }
         const room = rooms[id];
-        const theme = room?.theme ?? themes[2];
+        const theme = room?.theme ?? rooms[0].theme;
         const dx = room ? Math.abs(col - room.centerX) : 0;
         const dy = room ? Math.abs(row - room.centerY) : 0;
         const isPaved = !room || dx <= 2 || dy <= 1 || dx ** 2 + dy ** 2 < 31 || (theme === themes[3] && dx < 8);
         const palette = isPaved ? theme.floor : theme.grass;
         box(ctx, x, y, TILE, TILE, palette[Math.floor(random() * 3)]);
-        if (isPaved) {
+        if (dungeon.region.material === 'wood' || (dungeon.region.material === 'dock' && isPaved)) {
+          box(ctx, x, y, TILE, TILE, theme.floor[(col + row) % 3]);
+          for (let plank = 0; plank < 16; plank += 4) {
+            box(ctx, x, y + plank, 16, 1, '#251c324f');
+            box(ctx, x + (plank + row * 4) % 16, y + plank, 1, 4, '#251c327a');
+          }
+        } else if (dungeon.region.material === 'metal') {
+          box(ctx, x, y, 16, 16, theme.floor[(col + row) % 3]);
+          box(ctx, x, y, 16, 1, '#96919c');
+          box(ctx, x, y, 1, 16, '#343740');
+          box(ctx, x+2, y+2, 2, 2, '#aca7a1');
+          if (dy === 1 && col % 2 === 0) box(ctx,x+4,y+7,8,2,'#a48760');
+        } else if (isPaved) {
           for (let p = 0; p < 3; p++) {
             const left = x + 1 + (p % 2) * 3;
             const top = y + 2 + p * 5;

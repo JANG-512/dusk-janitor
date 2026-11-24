@@ -146,6 +146,31 @@ const DuskArt = (() => {
     }
     ctx.restore();
     switch (type) {
+      case 'shelf':
+        rect(ctx,x-15,y-22,30,23,'#3a2933');
+        for (let row=0; row<2; row++) {
+          for(let i=0;i<7;i++) {
+            const h=5+(row+i)%3;
+            rect(ctx,x-12+i*4,y-13+row*10-h,3,h,['#9d6556','#6f9391','#af926a','#83768d'][(i+row)%4]);
+          }
+          rect(ctx,x-14,y-13+row*10,28,2,'#ba9069');
+        }
+        break;
+      case 'net':
+        for (const end of [-12,12]) rect(ctx,x+end,y-18,3,19,'#896957');
+        for(let i=-11;i<=12;i++){
+          const sag=Math.round((1-(i/12)**2)*5);
+          for(let j=0;j<=8;j++) if(j===0 || (i+j)%4===0 || (i-j)%4===0)
+            rect(ctx,x+i,y-16+sag+j,1,1,'#c0af8f');
+        }
+        break;
+      case 'furnace':
+        rect(ctx,x+4,y-24,7,11,'#594d55');
+        rect(ctx,x-12,y-16,25,17,'#343440');
+        rect(ctx,x-10,y-14,21,12,'#857377');
+        rect(ctx,x-7,y-10,15,8,'#4e363e');
+        for(let i=0;i<5;i++) rect(ctx,x-6+i*3,y-7-Math.floor(2*Math.sin(time*4+i)),2,5,i%2?'#e19255':'#ffbf71');
+        break;
       case 'house':
       case 'chapel':
         timberHouse(ctx, x, y, zone.roof, type === 'chapel');

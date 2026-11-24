@@ -120,8 +120,8 @@
     ctx.imageSmoothingEnabled = false;
   }
 
-  function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0], travel = false) {
-    dungeon = generateDungeon(seed);
+  function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0], travel = false, regionIndex = travel ? dungeon.regionIndex + 1 : 0) {
+    dungeon = generateDungeon(seed, regionIndex);
     world = bakeWorld(dungeon);
     navigation = dungeon.grid.map((value, i) => {
       const x = (i % MAP_W + .5) * TILE;
@@ -146,6 +146,9 @@
       if (role === 'alchemist') run.catalyst = 1;
       if (role === 'keeper') run.weapons.soap = 1;
       run.hand = [];
+      run.pendingReveals = [];
+      run.revealUntil = 0;
+      ui['card-reveal'].hidden = true;
       run.mirrorUntil = run.fogUntil = 0;
     } else {
       hero.x = currentRoom.cx;
@@ -187,7 +190,7 @@
     ui.pause.setAttribute('aria-label', '일시 정지');
     resetInput();
     activate(currentRoom, true);
-    announce('달안개 마을에 오염이 번지고 있습니다', 4.2);
+    announce((travel ? '다음 지역 도착 · ' : '탐험 시작 · ') + dungeon.region.name, 4.2);
     updateHud();
     ui.game.focus({ preventScroll: true });
   }
@@ -337,6 +340,28 @@
     {name:'가시 계약', kind:'저주', desc:'체력을 최대 2 소모하고 경험치 12를 얻습니다. 체력은 최소 1이 남습니다.', play(){hero.hp=Math.max(1,hero.hp-2);run.xp+=12;}},
     {name:'맑은 바람', kind:'축복', desc:'안개와 필드 반전을 해제하고 회피를 즉시 준비합니다.', play(){run.fogUntil=run.mirrorUntil=0;hero.dashCooldown=0;}}
   ];
+  function updateReveal() {
+    if (run.time < run.revealUntil) return;
+    const panel = ui['card-reveal'];
+    if (!run.pendingReveals.length) {
+      panel.hidden = true;
+      return;
+    }
+    const id = run.pendingReveals.shift();
+    const card = deck[id];
+    const curse = card.kind === '저주';
+    panel.hidden = false;
+    panel.classList.toggle('curse', curse);
+    ui['card-sigil'].textContent = ['♬','◇','◈','≋','✦','❄','†','≈'][id];
+    ui['card-state'].textContent = curse ? '저주 · 즉시 발동' : card.kind + ' · 손패에 추가';
+    ui['card-name'].textContent = card.name;
+    ui['card-effect'].textContent = card.desc;
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      panel.animate([{opacity:0,transform:'perspective(320px) rotateY(-72deg) translateY(10px)'},{opacity:1,transform:'none'}],{duration:380,easing:'ease-out'});
+    }
+    run.revealUntil = run.time + 5;
+  }
+
   function openHand() {
     if(mode!=='playing') return;
     const counts=new Map();
@@ -377,7 +402,7 @@
     }
     if (uiState.room !== currentRoom.id) {
       uiState.room = currentRoom.id;
-      ui.region.textContent = currentRoom.theme.name;
+      ui.region.textContent = (dungeon.regionIndex + 1) + '구역 · ' + currentRoom.theme.name;
     }
     if (uiState.clean !== run.clean) {
       uiState.clean = run.clean;
@@ -849,7 +874,7 @@
     hero.hp = Math.min(hero.max, hero.hp + 1);
     tone(392, 494, .17);
     tone(587, 785, .26, 'triangle', .11);
-    announce(run.clean === dungeon.rooms.length ? '새벽의 문이 열렸습니다 · 지도에서 표시를 찾으세요' : room.theme.name + ' 정화 완료 · 체력 +1', 4);
+    announce(run.clean === dungeon.rooms.length ? '모든 방 정화 완료' : room.theme.name + ' 정화 완료 · 체력 +1', 4);
   }
 
   function placeGem(m) {
@@ -941,6 +966,8 @@
     if (run.kills % cardInterval === 0) {
       const id=Math.floor(Math.random()*deck.length);
       const card=deck[id];
+      run.pendingReveals.push(id);
+      updateReveal();
       if (card.kind==='저주') {
         card.play();
         run.curseNotice=card.name;
@@ -949,7 +976,7 @@
         tone(230,100,.22);
       } else {
         run.hand.push(id);
-        announce('카드 획득 · '+card.name,3);
+
       }
     }
     m.room.resolved++;
@@ -989,7 +1016,7 @@
     if (hero.hp > 0) return;
     updateHud();
     dialog('lost', 'RUN ENDED', '마을에 밤이 남았습니다', '정화 ' + run.clean + ' / ' + dungeon.rooms.length + ' · 처치 ' + run.kills, [
-      action('캐릭터 다시 선택', () => {sessionStarted=false;selectRole();}), action('같은 던전 다시 도전', () => newRun(dungeon.seed), true)
+      action('캐릭터 다시 선택', () => {sessionStarted=false;selectRole();}), action('같은 던전 다시 도전', () => newRun(dungeon.seed, false, dungeon.regionIndex), true)
     ]);
   }
 
@@ -1317,6 +1344,7 @@
 
   function update(dt) {
     run.time += dt;
+    updateReveal();
     run.shake = Math.max(0, run.shake - dt);
     if (run.time >= noticeUntil && ui.message.textContent) ui.message.textContent = '';
     if (run.time > 8 && !ui.hint.hidden) ui.hint.hidden = true;
@@ -1354,12 +1382,11 @@
         room.cores[i].dirt = Math.max(goal, room.cores[i].dirt - dt * .75);
       }
     }
-    if (run.xp >= run.need) levelUp();
-    if (mode === 'playing' && run.clean === dungeon.rooms.length && distance(hero, { x: dungeon.exit.cx, y: dungeon.exit.cy }) < 23) {
-      dialog('won', 'ALL CLEAR', '달안개 마을에 돌아온 아침', '모든 방을 정화하고 몬스터 ' + run.kills + '마리를 쓸어냈습니다.', [
-        action('타이틀로', () => {sessionStarted=false;titleScreen();})
-      ]);
+    if (run.clean === dungeon.rooms.length) {
+      for (const gem of gems) run.xp += gem.value;
+      newRun(undefined, true);
     }
+    if (run.xp >= run.need) levelUp();
     updateHud();
   }
 
@@ -1442,7 +1469,7 @@
       } else if (fx.kind === 'pixel') {
         box(fx.x, fx.y, fx.size, fx.size, fx.color);
       } else if (fx.kind === 'text') {
-        ctx.font = 'bold 9px monospace';
+        ctx.font = '11px Galmuri, monospace';
         ctx.strokeStyle = '#2c1e32';
         ctx.lineWidth = 2;
         ctx.save();

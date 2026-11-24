@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14141d">
+  <title>황혼의 청소부 · Dusk Janitor</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath fill='%23332735' d='M0 0h26v26H0z'/%3E%3Cpath fill='none' stroke='%23f3cd8a' stroke-width='1.5' d='m14 11 7-8m-5 9-5-3-5 4-2 8 6-1 5-3 1-5ZM7 16l4 3m-2-6 4 3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css?v=4">
+  <script defer src="dungeon.js?v=4"></script>
+  <script defer src="art.js?v=4"></script>
+  <script defer src="scene.js?v=4"></script>
+  <script defer src="game.js?v=4"></script>
+</head>
+<body>
+  <main id="game">
+    <canvas id="world" aria-label="황혼의 청소부 던전. 방향키 또는 WASD로 이동하고, 스페이스바나 마우스 클릭으로 빗자루를 휘두르세요. Shift로 회피합니다."></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <div class="hud" id="hud">
+      <header class="identity">
+        <div class="game-mark" aria-hidden="true">
+          <svg viewBox="0 0 26 26" fill="none"><path d="m14 11 7-8m-5 9-5-3-5 4-2 8 6-1 5-3 1-5ZM7 16l4 3m-2-6 4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>
+        </div>
+        <div class="identity-label"><h1>황혼의 청소부</h1><span id="region">달안개 마을</span></div>
+        <div class="health" id="health" role="img"></div>
+      </header>
+
+      <div class="run-clock">
+        <span class="clock-label">생존 시간</span>
+        <time id="clock">00:00</time>
+        <span class="area-progress" id="area-progress"></span>
+      </div>
+
+      <aside class="scout">
+        <div class="toolbox" aria-label="게임 설정">
+          <button id="sound" type="button" aria-pressed="false" aria-label="소리 켜기" title="소리 켜기">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 8h3l4-3v10l-4-3H3zM13 7c2 1 2 5 0 6m2-8c4 3 4 7 0 10" stroke="currentColor" stroke-width="1.4"/><path class="mute" d="m3 17 14-14" stroke="currentColor" stroke-width="1.5"/></svg>
+          </button>
+          <button id="fullscreen" type="button" aria-pressed="false" aria-label="전체 화면 켜기" title="전체 화면 켜기">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7 4H4v3m9-3h3v3m0 6v3h-3m-6 0H4v-3" stroke="currentColor" stroke-width="1.5"/></svg>
+          </button>
+          <button id="pause" type="button" aria-label="일시 정지" title="일시 정지">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7 5v10m6-10v10" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+        </div>
+        <div class="map-frame">
+          <div><span>던전 지도</span><span id="map-seed"></span></div>
+          <canvas id="map" width="140" height="99" aria-label="탐험한 방과 통로를 표시하는 지도"></canvas>
+        </div>
+      </aside>
+
+      <div class="status">
+        <div class="stat"><span class="mini-icon hostile" aria-hidden="true">◆</span><span>처치</span><b id="kills">0</b></div>
+        <div class="stat"><span class="mini-icon friendly" aria-hidden="true">✦</span><span>동료</span><b id="party">0</b></div>
+      </div>
+      <div class="contract" id="contract"></div>
+      <div class="encounter" id="encounter"></div>
+
+      <button type="button" id="interact" hidden></button>
+      <div id="message" class="message" aria-live="polite"></div>
+
+      <div id="hint" class="hint"><span><kbd>W A S D</kbd> 이동</span><span><kbd>SHIFT</kbd> 회피</span><span><kbd>SPACE / 클릭</kbd> 빗자루 공격</span></div>
+      <div class="loadout" id="loadout" aria-label="청소 도구"></div>
+
+      <div class="experience">
+        <div class="level-row"><b id="level">Lv. 1</b><span>경험치</span><span id="xp">0 / 8</span></div>
+        <div class="xp-track" id="xp-track" role="progressbar" aria-label="경험치" aria-valuemin="0" aria-valuemax="8" aria-valuenow="0"><i id="xp-fill"></i></div>
+      </div>
+    </div>
+
+    <div class="touch-controls">
+      <div id="stick" aria-label="이동 조이스틱"><i></i></div>
+      <button id="dash" type="button">회피</button>
+      <button id="sweep" type="button">공격</button>
+    </div>
+
+    <div class="modal" id="modal" hidden>
+      <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+        <div id="dialog-label" class="dialog-label"></div>
+        <h2 id="dialog-title"></h2>
+        <p id="dialog-detail"></p>
+        <div id="dialog-actions"></div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

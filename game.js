@@ -36,7 +36,25 @@
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
   let dungeon, world, navigation, run, hero, monsters, gems, effects, shots, currentRoom, camera, motes;
-  let muted = true;
+  const roles = {
+    sweeper: {name:'솔 · 광장 파수꾼', color:'#69ada0', icon:'broom', start:'세 번째 빗질마다 공명 파동을 냅니다.', paths:[
+      ['울림 증폭','공명 파동 피해 +2'], ['장대 빗자루','모든 빗질과 파동의 사거리 +12']]},
+    alchemist: {name:'루비 · 화약 조제사', color:'#ed9276', icon:'spray', start:'네 번째 빗질이 적중하면 지연 폭발을 일으킵니다.', paths:[
+      ['고농축 약제','기폭제 폭발 피해 +2'], ['확산 배합','기폭제 폭발 반경 +10']]},
+    keeper: {name:'모아 · 정령지기', color:'#ad96ec', icon:'soap', start:'회전 비눗방울을 지니고, 무피격 2연속 처치부터 동료를 모읍니다.', paths:[
+      ['무리 훈련','임시 동료의 공격 피해 +1'], ['수호 궤도','비눗방울 접촉 피해 +1']]}
+  };
+  let role = 'sweeper';
+  const defaults = { sound:false, volume:65, shake:true, damage:true, particles:100, map:true, zoom:100, left:false, sensitivity:100, opacity:85 };
+  let settings = {...defaults};
+  try {
+    const saved = JSON.parse(localStorage.getItem('dusk-settings') || '{}');
+    for (const key of Object.keys(defaults)) {
+      if (typeof saved[key] === typeof defaults[key]) settings[key] = saved[key];
+    }
+  } catch { /* Storage may be unavailable in private browsing. */ }
+  let muted = !settings.sound;
+  let sessionStarted = false;
   let audio;
   let mode;
   let noticeUntil;
@@ -50,14 +68,14 @@
   const toward = (a, b) => vector(b.x - a.x, b.y - a.y);
 
   function tone(from, to, length, type = 'triangle', delay = 0) {
-    if (muted || audio?.state !== 'running') return;
+    if (muted || !settings.volume || audio?.state !== 'running') return;
     const now = audio.currentTime + delay;
     const oscillator = audio.createOscillator();
     const gain = audio.createGain();
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(from, now);
     oscillator.frequency.exponentialRampToValueAtTime(to, now + length);
-    gain.gain.setValueAtTime(.05, now);
+    gain.gain.setValueAtTime(Math.max(.001,.08 * settings.volume / 100), now);
     gain.gain.exponentialRampToValueAtTime(.001, now + length);
     oscillator.connect(gain).connect(audio.destination);
     oscillator.start(now);
@@ -69,18 +87,24 @@
       '" stroke="currentColor" stroke-width="1.5" stroke-linejoin="miter"/></svg>';
   }
 
-  function resetInput() {
-    keys.clear();
+  function releaseStick() {
+    const id = stick.id;
+    if (id !== null && ui.stick.hasPointerCapture(id)) ui.stick.releasePointerCapture(id);
     stick.id = null;
     stick.x = 0;
     stick.y = 0;
     ui.stick.firstElementChild.style.transform = '';
   }
 
+  function resetInput() {
+    keys.clear();
+    releaseStick();
+  }
+
   const focus = { x: 0, y: 0 };
   function resize() {
     const { clientWidth: w, clientHeight: h } = ui.game;
-    const zoom = clamp(Math.min(w, h) / 335, 1.55, 2.95);
+    const zoom = clamp(Math.min(w, h) / 335, 1.55, 2.95) * settings.zoom / 100;
     canvas.width = Math.ceil(w / zoom);
     canvas.height = Math.ceil(h / zoom);
     focus.x = ui['camera-center'].offsetLeft * canvas.width / w;
@@ -106,6 +130,11 @@
       xp: 0, need: 7, level: 1, weapons: { broom: 1 }, bonus: {}, timers: {}, shake: 0,
       charges: [], blastKills: 0, catalyst: 0, echo: 0, extension: 0, swings: 0, shield: false, fieldAt: -1, fieldCooldown: 0, hints: 0
     };
+    hero.role = role;
+    hero.scarf = roles[role].color;
+    if (role === 'sweeper') run.echo = 1;
+    if (role === 'alchemist') run.catalyst = 1;
+    if (role === 'keeper') run.weapons.soap = 1;
     camera = { x: hero.x, y: hero.y };
     monsters = [];
     gems = [];
@@ -284,6 +313,7 @@
   }
 
   function dialog(next, label, title, detail, buttons) {
+    ui.modal.dataset.screen = next;
     mode = next;
     lastFocus = document.activeElement;
     resetInput();
@@ -350,6 +380,92 @@
     dialog('station', currentRoom.theme.name, stationNames[station.kind], '이곳에서는 한 번만 보상을 받을 수 있습니다.', options);
   }
 
+  function applySettings(save = true) {
+    const game = ui.game;
+    muted = !settings.sound;
+    game.classList.toggle('southpaw',settings.left);
+    game.style.setProperty('--control-opacity',settings.opacity / 100);
+    ui.map.parentElement.hidden = !settings.map;
+    ui.sound.setAttribute('aria-pressed',String(settings.sound));
+    ui.sound.title = muted ? '소리 켜기' : '소리 끄기';
+    ui.sound.setAttribute('aria-label',ui.sound.title);
+    if (save) {
+      try { localStorage.setItem('dusk-settings',JSON.stringify(settings)); } catch { /* Keep session preferences. */ }
+    }
+    resize();
+  }
+  async function unlockAudio() {
+    if (muted) return;
+    audio ??= new AudioContext();
+    await audio.resume();
+  }
+  function titleScreen() {
+    const buttons = [];
+    if (sessionStarted) buttons.push(action('탐험 이어하기',resume));
+    buttons.push(action(sessionStarted ? '새 탐험 준비' : '탐험 준비',selectRole),action('설정',()=>settingsScreen(titleScreen),true));
+    dialog('title','DUSK JANITOR','황혼의 청소부','달안개 마을의 마지막 야간 근무',buttons);
+  }
+  function selectRole() {
+    const cards = Object.entries(roles).map(([key,data])=>{
+      const button = action('',()=>{
+        role = key;
+        sessionStarted = true;
+        unlockAudio();
+        newRun();
+        announce(data.name + ' · ' + data.start,5);
+      });
+      button.className = 'role-card';
+      const portrait = document.createElement('canvas');
+      portrait.width = 36;
+      portrait.height = 32;
+      drawHero(portrait.getContext('2d'),{x:18,y:27,facing:{x:1,y:0},role:key,scarf:data.color},0);
+      const name = document.createElement('b');
+      name.textContent = data.name;
+      const desc = document.createElement('small');
+      desc.textContent = data.start;
+      button.append(portrait,name,desc);
+      return button;
+    });
+    dialog('roles','청소반 명부','캐릭터 선택',sessionStarted ? '선택하면 진행 중인 탐험을 끝내고 새 던전에서 시작합니다.' : '청소부를 선택하면 탐험이 시작됩니다.',[...cards,action('뒤로',titleScreen,true)]);
+  }
+  function settingsScreen(back) {
+    const groups = [
+      ['소리',[['sound','효과음'],['volume','효과음 음량',0,100]]],
+      ['화면과 효과',[['zoom','화면 배율',75,130],['map','미니맵'],['shake','화면 흔들림'],['particles','입자 효과 밀도',0,100],['damage','피해 숫자']]],
+      ['터치 조작',[['left','오른손 이동 스틱'],['sensitivity','스틱 감도',60,160],['opacity','조작 버튼 불투명도',35,100]]]
+    ];
+    dialog('settings','환경 설정','설정','변경 사항은 이 기기에 자동 저장됩니다.',[action('완료',back)]);
+    const form = document.createElement('div');
+    form.className = 'settings-grid';
+    for (const [heading,items] of groups) {
+      const group = document.createElement('fieldset');
+      const legend = document.createElement('legend');
+      legend.textContent = heading;
+      group.append(legend);
+      for (const [key,name,min,max] of items) {
+        const label = document.createElement('label');
+        const input = document.createElement('input');
+        const value = document.createElement('output');
+        input.type = min === undefined ? 'checkbox' : 'range';
+        if (input.type === 'checkbox') input.checked = settings[key];
+        else {
+          input.min=min; input.max=max; input.step=5; input.value=settings[key];
+          value.textContent=settings[key]+'%';
+        }
+        input.oninput=()=>{
+          settings[key]=input.type==='checkbox' ? input.checked : Number(input.value);
+          if (input.type==='range') value.textContent=settings[key]+'%';
+          applySettings();
+          if (key==='sound' || key==='volume') unlockAudio().then(()=>tone(440,630,.08));
+        };
+        label.append(name,input,value);
+        group.append(label);
+      }
+      form.append(group);
+    }
+    ui['dialog-actions'].prepend(form);
+  }
+
   let installPrompt;
   function installed() {
     return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
@@ -364,7 +480,7 @@
     if (mode === 'paused') showPauseMenu();
   });
   function showPauseMenu() {
-    const buttons = [action('계속하기', resume), action('새 던전', () => newRun(), true)];
+    const buttons = [action('계속하기', resume), action('설정',()=>settingsScreen(showPauseMenu),true), action('타이틀로',titleScreen,true)];
     let detail = '빗자루를 내려놓고 잠시 쉬어 갑니다.';
     if (!installed() && installPrompt) {
       buttons.push(action('홈 화면에 설치', async () => {
@@ -396,7 +512,12 @@
     const passives = utility.filter(({ key, max }) => (run.bonus[key] ?? 0) < max);
     const available = [...tools, ...passives];
     const unowned = tools.filter(({ key }) => !run.weapons[key]);
-    const options = [];
+    const specialty = roles[role].paths.map(([label,desc],i)=>({
+      key:role+i, label, desc, icon:weaponData[roles[role].icon].icon
+    })).filter(item=>(run.bonus[item.key] ?? 0)<4);
+    const options = specialty.length ? [specialty[Math.floor(Math.random()*specialty.length)]] : [];
+    // On milestone levels, offer both branches so the player can deliberately specialize.
+    if (run.level % 3 === 0 && specialty.length === 2) options.push(specialty.find(item=>item!==options[0]));
     if (unowned.length) options.push(unowned[Math.floor(Math.random() * unowned.length)]);
     while (options.length < 3 && available.some(item => !options.includes(item))) {
       const pool = available.filter(item => !options.includes(item));
@@ -417,6 +538,9 @@
       button.innerHTML = svg(option.icon) + '<b>' + option.label + ' Lv.' + next + '</b><small>' + option.desc + '</small>';
       button.onclick = () => {
         holder[option.key] = next;
+        if (option.key === 'sweeper0') run.echo += 2;
+        if (option.key === 'sweeper1') run.extension += 12;
+        if (option.key === 'alchemist0') run.catalyst += 2;
         if (option.key === 'heal') {
           hero.max++;
           hero.hp++;
@@ -429,7 +553,7 @@
   }
 
   function burst(x, y, color, amount, speed) {
-    for (let i = 0; i < amount; i++) {
+    for (let i = 0; i < Math.round(amount * settings.particles / 100); i++) {
       const angle = Math.random() * Math.PI * 2;
       const pace = speed * (.25 + Math.random() * .75);
       effects.push({ kind: 'pixel', x, y, vx: Math.cos(angle) * pace, vy: Math.sin(angle) * pace, color, life: .16 + Math.random() * .43, size: Math.random() < .28 ? 3 : 2 });
@@ -452,7 +576,7 @@
   }
 
   function showFear(origin) {
-    if (run.streak < 4 || run.allies >= 2) return;
+    if (run.streak < (role === 'keeper' ? 2 : 4) || run.allies >= 2) return;
     if (monsters.filter(m => m.hp > 0 && m.fear > 0).length + run.allies >= 2) return;
     const candidates = hostiles().filter(m => !m.warden && m.room === origin.room && distance(origin, m) < 115);
     if (candidates.length < 2) return;
@@ -554,7 +678,7 @@
     m.recoil = .14;
     m.aim = toward(origin, m);
     burst(m.x, m.y - 7, m.hp ? '#e798b7' : '#dc91ba', m.hp ? 5 : 12, m.hp ? 36 : 61);
-    effects.push({ kind: 'text', x: m.x, y: m.y - 16, text: String(amount), color: '#ffe4b0', life: .43 });
+    if (settings.damage) effects.push({ kind: 'text', x: m.x, y: m.y - 16, text: String(amount), color: '#ffe4b0', life: .43 });
     if (m.hp > 0) return;
     if (player) {
       run.streak++;
@@ -597,7 +721,7 @@
     if (hero.hp > 0) return;
     updateHud();
     dialog('lost', 'RUN ENDED', '마을에 밤이 남았습니다', '정화 ' + run.clean + ' / ' + dungeon.rooms.length + ' · 처치 ' + run.kills, [
-      action('새 던전 도전', () => newRun()), action('같은 던전 다시 도전', () => newRun(dungeon.seed), true)
+      action('캐릭터 다시 선택', () => {sessionStarted=false;selectRole();}), action('같은 던전 다시 도전', () => newRun(dungeon.seed), true)
     ]);
   }
 
@@ -646,7 +770,7 @@
       const dir = toward(hero, m);
       if (r <= 18 || dir.x * aim.x + dir.y * aim.y > -.02) {
         if (primed) {
-          arm(m,42,.35,2 + run.catalyst);
+          arm(m,42 + 10*(run.bonus.alchemist1 ?? 0),.35,2 + run.catalyst);
           primed = false;
         }
         damageMonster(m, 1 + Math.floor(broom / 2), hero);
@@ -687,7 +811,7 @@
       if (!tileFree(bubble.x, bubble.y)) continue;
       for (const m of visible) {
         if (m.soapHit <= 0 && distance(bubble, m) <= 11) {
-          damageMonster(m, Math.ceil(soap / 2), bubble);
+          damageMonster(m, Math.ceil(soap / 2) + (run.bonus.keeper1 ?? 0), bubble);
           m.soapHit = .55;
         }
       }
@@ -724,7 +848,7 @@
       if (target && m.cooldown <= 0 && distance(m, target) < 29) {
         m.cooldown = .84;
         sweep(m, toward(m, target), '#a8ebc3', 26);
-        damageMonster(target, 1, m, false);
+        damageMonster(target, 1 + (run.bonus.keeper0 ?? 0), m, false);
       }
       return;
     }
@@ -918,7 +1042,7 @@
     if (run.xp >= run.need) levelUp();
     if (mode === 'playing' && run.clean === dungeon.rooms.length && distance(hero, { x: dungeon.exit.cx, y: dungeon.exit.cy }) < 23) {
       dialog('won', 'ALL CLEAR', '달안개 마을에 돌아온 아침', '모든 방을 정화하고 몬스터 ' + run.kills + '마리를 쓸어냈습니다.', [
-        action('새 던전 시작', () => newRun())
+        action('타이틀로', () => {sessionStarted=false;titleScreen();})
       ]);
     }
     updateHud();
@@ -1021,8 +1145,8 @@
   }
 
   function viewOrigin() {
-    const shakeX = Math.sin(run.time * 95) * run.shake * 14;
-    const shakeY = Math.cos(run.time * 128) * run.shake * 10;
+    const shakeX = Math.sin(run.time * 95) * Number(settings.shake) * run.shake * 14;
+    const shakeY = Math.cos(run.time * 128) * Number(settings.shake) * run.shake * 10;
     return {
       x: Math.round(camera.x - focus.x + shakeX),
       y: Math.round(camera.y - focus.y + shakeY)
@@ -1136,7 +1260,7 @@
     ctx.globalAlpha = 1;
     drawEffects();
     ctx.restore();
-    drawMap();
+    if (settings.map) drawMap();
   }
 
   const control = new Set(['w', 'a', 's', 'd', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'Shift', 'Escape', ' ']);
@@ -1150,11 +1274,12 @@
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     if (key === 'Tab' && !ui.modal.hidden) {
-      const items = [...ui['dialog-actions'].querySelectorAll('button')];
+      const items = [...ui['dialog-actions'].querySelectorAll('button,input')];
       const at = items.indexOf(document.activeElement);
       items[(at + (event.shiftKey ? items.length - 1 : 1)) % items.length].focus();
       event.preventDefault();
     }
+    if (event.target instanceof HTMLInputElement) return;
     if (key === 'e' && !event.repeat) useStation();
     if (!control.has(key)) return;
     if (key === ' ' && event.target instanceof HTMLButtonElement) return;
@@ -1168,7 +1293,9 @@
 
   addEventListener('keyup', event => keys.delete(event.key.length === 1 ? event.key.toLowerCase() : event.key));
   addEventListener('blur', resetInput);
-  addEventListener('resize', resize);
+  addEventListener('pagehide', resetInput);
+  addEventListener('orientationchange', resetInput);
+  addEventListener('resize', () => { resetInput(); resize(); });
   new ResizeObserver(resize).observe(ui.game);
   for (const axis of ['horizontal', 'vertical']) {
     matchMedia('(' + axis + '-viewport-segments: 2)').addEventListener('change', resize);
@@ -1187,7 +1314,7 @@
     const y = event.clientY - (bounds.top + bounds.height / 2);
     const length = Math.hypot(x, y);
     const dir = vector(x, y);
-    const strength = Math.min(1, length / 26);
+    const strength = Math.min(1, length * settings.sensitivity / 2600);
     stick.x = dir.x * strength;
     stick.y = dir.y * strength;
     ui.stick.firstElementChild.style.transform = 'translate(' + stick.x * 24 + 'px,' + stick.y * 24 + 'px)';
@@ -1206,18 +1333,26 @@
   }, { passive: false });
 
   ui.stick.addEventListener('pointerdown', event => {
-    if (mode !== 'playing' || stick.id !== null) return;
+    if (mode !== 'playing') return;
+    releaseStick();
     stick.id = event.pointerId;
     ui.stick.setPointerCapture(event.pointerId);
     steer(event);
   });
   ui.stick.addEventListener('pointermove', steer);
-  ui.stick.addEventListener('lostpointercapture', event => {
-    if (event.pointerId !== stick.id) return;
-    stick.id = null;
-    stick.x = stick.y = 0;
-    ui.stick.firstElementChild.style.transform = '';
-  });
+  function finishPointer(event) {
+    if (event.pointerId === stick.id) releaseStick();
+  }
+  for (const name of ['pointerup','pointercancel','lostpointercapture']) {
+    window.addEventListener(name,finishPointer,true);
+  }
+  // A system gesture can terminate the touch stream without a matching capture event.
+  function reconcileTouches(event) {
+    if (stick.id !== null && !Array.from(event.touches).some(t=>ui.stick.contains(t.target))) releaseStick();
+  }
+  for (const name of ['touchstart','touchmove','touchend','touchcancel']) {
+    window.addEventListener(name,reconcileTouches,{capture:true, passive:true});
+  }
   ui.dash.addEventListener('pointerdown', dash);
   ui.dash.addEventListener('keydown', event => {
     if (event.key === 'Enter' || event.key === ' ') dash();
@@ -1245,15 +1380,10 @@
   ui.interact.addEventListener('click', useStation);
   ui.pause.addEventListener('click', togglePause);
   ui.sound.addEventListener('click', async () => {
-    muted = !muted;
-    ui.sound.setAttribute('aria-pressed', String(!muted));
-    ui.sound.setAttribute('aria-label', muted ? '소리 켜기' : '소리 끄기');
-    ui.sound.title = muted ? '소리 켜기' : '소리 끄기';
-    if (!muted) {
-      audio ??= new AudioContext();
-      await audio.resume();
-      tone(440, 640, .12);
-    }
+    settings.sound = !settings.sound;
+    applySettings();
+    await unlockAudio();
+    tone(440,640,.12);
   });
   ui.fullscreen.hidden = !document.fullscreenEnabled;
   ui.fullscreen.addEventListener('click', async () => {
@@ -1273,8 +1403,9 @@
     resize();
   });
 
-  resize();
+  applySettings(false);
   newRun();
+  titleScreen();
   let lastFrame = performance.now();
   function loop(now) {
     const dt = Math.min(.033, Math.max(0, (now - lastFrame) / 1000));

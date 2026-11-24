@@ -241,7 +241,7 @@ const DuskArt = (() => {
     rect(ctx, x + side * 6 - 2, y - 4, 4, 5, '#dfb575');
     rect(ctx, x + side * 6 - 2, y - 2, 4, 2, '#a87858');
     // A tied scarf, tool belt and stitched satchel follow the cleaner's stride.
-    rect(ctx,x-4,y-11,8,2,'#69ada0');
+    rect(ctx,x-4,y-11,8,2,hero.scarf || '#69ada0');
     rect(ctx,x-side*6,y-11+step,3,4,'#48877e');
     rect(ctx,x-5,y-6,10,2,'#564151');
     rect(ctx,x,y-6,2,2,'#f3cb83');
@@ -249,6 +249,16 @@ const DuskArt = (() => {
     rect(ctx,x-side*5-2,y-8,4,1,'#dfad77');
     rect(ctx,x-5,y-17,10,2,'#987054');
     rect(ctx,x-7,y-16,14,1,'#edce94');
+    if (hero.role === 'alchemist') {
+      rect(ctx,x-4,y-16,9,3,'#4b3a53');
+      rect(ctx,x-3,y-16,3,2,'#a9dfda');
+      rect(ctx,x+2,y-16,2,2,'#a9dfda');
+      rect(ctx,x-6,y-6,3,4,'#f29479');
+    } else if (hero.role === 'keeper') {
+      rect(ctx,x-6,y-20,3,5,'#a488be');
+      rect(ctx,x-7,y-21,2,3,'#d3afdb');
+      rect(ctx,x+5,y-7,3,4,'#a9e5b3');
+    }
     for (let n=0;n<3;n++) rect(ctx,x+side*6-2+n*2,y-1,1,3,'#f1ca83');
     ctx.restore();
   }

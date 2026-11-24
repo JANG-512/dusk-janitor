@@ -77,11 +77,14 @@
     ui.stick.firstElementChild.style.transform = '';
   }
 
+  const focus = { x: 0, y: 0 };
   function resize() {
     const { clientWidth: w, clientHeight: h } = ui.game;
     const zoom = clamp(Math.min(w, h) / 335, 1.55, 2.95);
     canvas.width = Math.ceil(w / zoom);
     canvas.height = Math.ceil(h / zoom);
+    focus.x = ui['camera-center'].offsetLeft * canvas.width / w;
+    focus.y = ui['camera-center'].offsetTop * canvas.height / h;
     ctx.imageSmoothingEnabled = false;
   }
 
@@ -347,12 +350,40 @@
     dialog('station', currentRoom.theme.name, stationNames[station.kind], '이곳에서는 한 번만 보상을 받을 수 있습니다.', options);
   }
 
+  let installPrompt;
+  function installed() {
+    return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  }
+  addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    installPrompt = event;
+    if (mode === 'paused') showPauseMenu();
+  });
+  addEventListener('appinstalled', () => {
+    installPrompt = null;
+    if (mode === 'paused') showPauseMenu();
+  });
+  function showPauseMenu() {
+    const buttons = [action('계속하기', resume), action('새 던전', () => newRun(), true)];
+    let detail = '빗자루를 내려놓고 잠시 쉬어 갑니다.';
+    if (!installed() && installPrompt) {
+      buttons.push(action('홈 화면에 설치', async () => {
+        const prompt = installPrompt;
+        installPrompt = null;
+        if (prompt) await prompt.prompt();
+        if (mode === 'paused') showPauseMenu();
+      }, true));
+    } else if (!installed() && location.protocol === 'https:' &&
+      (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))) {
+      detail = '홈 화면에 설치하려면 Safari의 공유 메뉴에서 ‘홈 화면에 추가’를 선택하세요.';
+    }
+    dialog('paused', 'PAUSE', '일시 정지', detail, buttons);
+  }
+
   function togglePause() {
     if (mode === 'paused') resume();
     else if (mode === 'playing') {
-      dialog('paused', 'PAUSE', '일시 정지', '빗자루를 내려놓고 잠시 쉬어 갑니다.', [
-        action('계속하기', resume), action('새 던전', () => newRun(), true)
-      ]);
+      showPauseMenu();
     }
   }
 
@@ -993,8 +1024,8 @@
     const shakeX = Math.sin(run.time * 95) * run.shake * 14;
     const shakeY = Math.cos(run.time * 128) * run.shake * 10;
     return {
-      x: Math.round(camera.x - canvas.width / 2 + shakeX),
-      y: Math.round(camera.y - canvas.height / 2 + shakeY)
+      x: Math.round(camera.x - focus.x + shakeX),
+      y: Math.round(camera.y - focus.y + shakeY)
     };
   }
 
@@ -1138,6 +1169,13 @@
   addEventListener('keyup', event => keys.delete(event.key.length === 1 ? event.key.toLowerCase() : event.key));
   addEventListener('blur', resetInput);
   addEventListener('resize', resize);
+  new ResizeObserver(resize).observe(ui.game);
+  for (const axis of ['horizontal', 'vertical']) {
+    matchMedia('(' + axis + '-viewport-segments: 2)').addEventListener('change', resize);
+  }
+  if (location.protocol !== 'file:' && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(error => console.warn('오프라인 준비 실패', error));
+  }
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && mode === 'playing') togglePause();
   });

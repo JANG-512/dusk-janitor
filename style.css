@@ -133,3 +133,50 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 
 .contract { position:absolute; left:var(--x); top:calc(var(--y) + 130px); color:#ffd8a3; font-size:10px; font-weight:750; text-shadow:1px 1px #211626; }
 @media(max-width:620px){ .contract {top:calc(var(--y) + 91px); font-size:9px;} }
+
+#game { height:100dvh; --focus-x:50%; --focus-y:50%; }
+#camera-center { position:absolute; left:var(--focus-x); top:var(--focus-y); pointer-events:none; }
+@media (display-mode:standalone) { #fullscreen { display:none; } }
+@media (pointer:coarse) and (min-width:621px) {
+  #stick, #sweep { bottom:max(55px,calc(env(safe-area-inset-bottom) + 40px)); }
+  #dash { bottom:max(127px,calc(env(safe-area-inset-bottom) + 112px)); }
+  .hud { --x:max(12px,env(safe-area-inset-left)); --y:max(10px,env(safe-area-inset-top)); }
+  .scout { right:max(12px,env(safe-area-inset-right)); }
+  #map { width:104px; height:74px; }
+}
+@media (orientation:landscape) and (max-height:520px) {
+  .identity { grid-template-columns:auto; }
+  .game-mark,.clock-label,.map-frame div { display:none; }
+  .identity h1 {font-size:15px;}
+  .health {margin-top:4px;gap:3px;}
+  .heart {width:12px;height:10px;}
+  .status {top:calc(var(--y) + 48px);}
+  .encounter {top:calc(var(--y) + 72px);}
+  .contract {top:calc(var(--y) + 87px);}
+  .run-clock time {font-size:23px;}
+  #map {width:72px;height:51px;}
+  .scout {gap:3px;}
+  .map-frame {padding:2px;}
+  #stick,#sweep {bottom:max(12px,env(safe-area-inset-bottom));}
+  #dash {bottom:max(18px,env(safe-area-inset-bottom));right:calc(max(18px,env(safe-area-inset-right)) + 71px);}
+  .loadout {left:calc(max(18px,env(safe-area-inset-left)) + 96px);bottom:max(10px,env(safe-area-inset-bottom));}
+  .slot {width:23px;height:23px;}
+  .experience {width:24%;bottom:max(9px,env(safe-area-inset-bottom));}
+  .message {top:17%;max-width:52%;}
+}
+@media (max-width:360px) and (orientation:portrait) {
+  .game-mark {display:none;}
+  .identity {grid-template-columns:auto;}
+  .toolbox button {width:25px;}
+}
+@media (horizontal-viewport-segments:2) {
+  #game {--focus-x:calc(env(viewport-segment-width 0 0) * .65);}
+  .run-clock,.message,#interact,.experience {left:var(--focus-x);}
+  .experience {width:calc(env(viewport-segment-width 0 0) * .55);}
+  .modal {right:auto;width:env(viewport-segment-width 0 0);}
+}
+@media (vertical-viewport-segments:2) {
+  #game {--focus-y:calc(env(viewport-segment-height 0 0) * .64);}
+  #interact {top:calc(env(viewport-segment-height 0 0) * .84);}
+  .modal {bottom:auto;height:env(viewport-segment-height 0 0);}
+}

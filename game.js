@@ -96,7 +96,15 @@
     ui.stick.firstElementChild.style.transform = '';
   }
 
+  let heldAttack = null;
+  function releaseAttack() {
+    const held = heldAttack;
+    heldAttack = null;
+    if (held?.element.hasPointerCapture(held.id)) held.element.releasePointerCapture(held.id);
+  }
+
   function resetInput() {
+    releaseAttack();
     keys.clear();
     releaseStick();
   }
@@ -254,7 +262,29 @@
     return slot;
   }
 
+  function updateCombatHud() {
+    const tenth = Math.floor(run.time * 10);
+    if (uiState.combatTick === tenth) return;
+    uiState.combatTick = tenth;
+    const remaining = seconds => seconds > 0 ? (Math.ceil(seconds*10)/10).toFixed(1)+'초' : '준비';
+    const tools = ['빗자루 '+remaining(run.timers.broom), '회피 '+remaining(hero.dashCooldown)];
+    if (run.weapons.spray) tools.push('분무기 '+remaining(run.timers.spray));
+    if (run.weapons.ring) tools.push('파동 '+remaining(run.timers.ring));
+    const specials = [];
+    if (run.echo) specials.push('공명 '+(3-run.swings%3)+'회 후');
+    if (run.catalyst) specials.push('기폭제 '+(4-run.swings%4)+'회 후');
+    if (run.weapons.soap) specials.push('비눗방울 접촉 간격 '+soapInterval+'초/적');
+    const lines = ['공속 '+(1/attackInterval(broomInterval)).toFixed(2)+'회/초',tools.join(' · ')];
+    if (specials.length) lines.push(specials.join(' · '));
+    for (const [i,slot] of run.circuits.entries()) {
+      lines.push((i+1)+' '+formulas[slot.formula][0]+' '+remaining(slot.ready-run.time));
+    }
+    const display = lines.join('\n');
+    if (uiState.combatText !== display) ui.combat.textContent = uiState.combatText = display;
+  }
+
   function updateHud() {
+    updateCombatHud();
     if (uiState.blastKills !== run.blastKills) {
       uiState.blastKills = run.blastKills;
       ui.contract.textContent = run.blastKills === 3 ? '✓ 폭파 의뢰 완료' : '폭파 의뢰 · 폭발로 처치 ' + run.blastKills + '/3';
@@ -547,7 +577,7 @@
       const targets = hostiles().filter(m=>distance(point,m)<=radius && clearLine(point,m));
       switch (slot.formula) {
         case 'mine':
-          arm(point,radius,.48,power+1,i);
+          arm(point,radius,.48,power+1,i,'정화탄');
           break;
         case 'darts':
           for (let ray=0;ray<8;ray++) {
@@ -563,7 +593,7 @@
             const next=nearest(from,hostiles().filter(m=>!struck.has(m) && clearLine(from,m)),radius);
             if (!next) break;
             effects.push({kind:'bolt',x:from.x,y:from.y-6,toX:next.x,toY:next.y-6,color,life:.2});
-            damageMonster(next,power,from,true,i);
+            damageMonster(next,power,from,true,i,formulas[slot.formula][0]);
             struck.add(next);
             from=next;
           }
@@ -577,7 +607,7 @@
               const steps = Math.min(8,Math.floor(distance(m,point)/4));
               for(let i=0;i<steps;i++) move(m,dir.x*4,dir.y*4,3);
             }
-            damageMonster(m,power,point,true,i);
+            damageMonster(m,power,point,true,i,formulas[slot.formula][0]);
           }
           if (slot.formula==='drain' && targets.length) hero.hp=Math.min(hero.max,hero.hp+1);
           if (slot.formula==='lure') {
@@ -745,8 +775,8 @@
   }
 
   // Both hazards and player-triggered charges use the same telegraph and blast radius.
-  function arm(point, radius, delay, damage, sourceSlot=-1) {
-    run.charges.push({x:point.x, y:point.y, radius, delay, damage, sourceSlot});
+  function arm(point, radius, delay, damage, sourceSlot=-1, source='기폭제') {
+    run.charges.push({x:point.x, y:point.y, radius, delay, damage, sourceSlot,source});
   }
 
   function updateCharges(dt) {
@@ -772,7 +802,7 @@
       circuitEvent('blast',c,c.sourceSlot);
       for (const m of hostiles()) {
         if (distance(m,c) > c.radius || !clearLine(c,m)) continue;
-          damageMonster(m,c.damage,c,true,c.sourceSlot);
+          damageMonster(m,c.damage,c,true,c.sourceSlot,c.source);
           if (m.hp === 0 && run.blastKills < 3) {
             run.blastKills++;
             if (run.blastKills === 3) {
@@ -791,13 +821,14 @@
 
   function ignite(keg) {
     keg.used = true;
-    arm(keg,56,.24,5);
+    arm(keg,56,.24,5,-1,'오염 통');
     burst(keg.x,keg.y-8,'#ffe3a1',8,36);
   }
 
-  function damageMonster(m, amount, origin, player = true, sourceSlot = -1) {
+  function damageMonster(m, amount, origin, player = true, sourceSlot = -1, source = '빗질') {
     if (m.hp <= 0 || m.friendly || m.fear > 0) return;
-    m.hp = Math.max(0, m.hp - amount);
+    const lostHp = Math.min(m.hp,amount);
+    m.hp -= lostHp;
     m.flash = .15;
     effects.push({kind:'impact', x:m.x, y:m.y-7, angle:Math.atan2(m.y-origin.y,m.x-origin.x), full:.18, life:.18});
     if (distance(hero,m) < 100) tone(m.hp ? 210 : 145,65,.055,'triangle');
@@ -806,7 +837,12 @@
     m.recoil = .14;
     m.aim = toward(origin, m);
     burst(m.x, m.y - 7, m.hp ? '#e798b7' : '#dc91ba', m.hp ? 5 : 12, m.hp ? 36 : 61);
-    if (settings.damage) effects.push({ kind: 'text', x: m.x, y: m.y - 16, text: String(amount), color: '#ffe4b0', life: .43 });
+    if (settings.damage) {
+      const lane = (m.hitCounter ?? 0) % 3;
+      m.hitCounter = lane + 1;
+      effects.push({ kind:'text', x:m.x+(lane-1)*7, y:m.y-15-lane*8, text:source+' −'+lostHp,
+        color:sourceSlot>=0 ? '#ccaeff' : !player ? '#a6efc2' : source==='빗질' ? '#ffe4b0' : '#abe5ff', life:.65 });
+    }
     if (m.hp > 0) return;
     if (player) {
       run.streak++;
@@ -854,8 +890,13 @@
     ]);
   }
 
+  const broomInterval = .61;
+  const soapInterval = .55;
+  function attackInterval(base) {
+    return base * .88 ** (run.bonus.haste ?? 0);
+  }
   function cooldown(key, duration) {
-    run.timers[key] = duration * .88 ** (run.bonus.haste ?? 0);
+    run.timers[key] = attackInterval(duration);
   }
 
   function sweep(origin, aim, color, radius) {
@@ -876,12 +917,12 @@
     const reach = 59 + 6 * broom + run.extension;
     hero.facing = aim;
     sweep(hero, aim, '#ffe9a9', reach);
-    cooldown('broom', .61);
+    cooldown('broom', broomInterval);
     run.swings++;
     if (run.echo && run.swings % 3 === 0) {
       effects.push({kind:'ring', x:hero.x, y:hero.y-4, radius:reach, life:.38, full:.38, color:'#9cebc2'});
       for (const m of hostiles()) {
-        if (distance(hero,m) <= reach && clearLine(hero,m)) damageMonster(m,run.echo,hero);
+        if (distance(hero,m) <= reach && clearLine(hero,m)) damageMonster(m,run.echo,hero,true,-1,'공명');
       }
     }
     for (const room of dungeon.rooms) {
@@ -910,6 +951,7 @@
 
   function updateWeapons(dt) {
     for (const key of Object.keys(run.weapons)) run.timers[key] = (run.timers[key] ?? 0) - dt;
+    if (heldAttack && run.timers.broom <= 0) swingHeld();
     const spray = run.weapons.spray;
     const ring = run.weapons.ring;
     const soap = run.weapons.soap;
@@ -931,7 +973,7 @@
     if (ring && run.timers.ring <= 0 && visible.some(m => m.hp > 0 && distance(hero, m) <= radius)) {
       effects.push({ kind: 'ring', x: hero.x, y: hero.y - 4, radius, life: .38, full: .38, color: '#d4a2fa' });
       for (const m of visible) {
-        if (distance(hero, m) <= radius) damageMonster(m, ring + 1, hero);
+        if (distance(hero, m) <= radius) damageMonster(m, ring + 1, hero,true,-1,'정화 파동');
       }
       cooldown('ring', 2.7);
     }
@@ -941,8 +983,8 @@
       if (!tileFree(bubble.x, bubble.y)) continue;
       for (const m of visible) {
         if (m.soapHit <= 0 && distance(bubble, m) <= 11) {
-          damageMonster(m, Math.ceil(soap / 2) + (run.bonus.keeper1 ?? 0), bubble);
-          m.soapHit = .55;
+          damageMonster(m, Math.ceil(soap / 2) + (run.bonus.keeper1 ?? 0), bubble,true,-1,'비눗방울');
+          m.soapHit = soapInterval;
         }
       }
     }
@@ -978,7 +1020,7 @@
       if (target && m.cooldown <= 0 && distance(m, target) < 29) {
         m.cooldown = .84;
         sweep(m, toward(m, target), '#a8ebc3', 26);
-        damageMonster(target, 1 + (run.bonus.keeper0 ?? 0), m, false);
+        damageMonster(target, 1 + (run.bonus.keeper0 ?? 0), m, false,-1,'동료');
         circuitEvent('ally',target);
       }
       return;
@@ -1097,7 +1139,7 @@
         for (const m of hostiles()) {
           if (!shot.hits.has(m.id) && distance(shot, m) < 9) {
             shot.hits.add(m.id);
-            damageMonster(m, shot.strength, shot,true,shot.sourceSlot);
+            damageMonster(m, shot.strength, shot,true,shot.sourceSlot,shot.sourceSlot===undefined ? '분무기' : '팔방 분사');
             if (shot.sourceSlot === undefined) circuitEvent('spray',m);
           }
         }
@@ -1262,7 +1304,9 @@
         box(fx.x, fx.y, fx.size, fx.size, fx.color);
       } else if (fx.kind === 'text') {
         ctx.font = 'bold 9px monospace';
-        box(fx.x - 1, fx.y - 6, 7, 7, '#392739');
+        ctx.strokeStyle = '#2c1e32';
+        ctx.lineWidth = 2;
+        ctx.strokeText(fx.text, Math.round(fx.x), Math.round(fx.y));
         ctx.fillStyle = fx.color;
         ctx.fillText(fx.text, Math.round(fx.x), Math.round(fx.y));
       } else {
@@ -1483,12 +1527,14 @@
   ui.stick.addEventListener('pointermove', steer);
   function finishPointer(event) {
     if (event.pointerId === stick.id) releaseStick();
+    if (event.pointerId === heldAttack?.id) releaseAttack();
   }
   for (const name of ['pointerup','pointercancel','lostpointercapture']) {
     window.addEventListener(name,finishPointer,true);
   }
   // A system gesture can terminate the touch stream without a matching capture event.
   function reconcileTouches(event) {
+    if (heldAttack?.touch && !Array.from(event.touches).some(t=>heldAttack.element.contains(t.target))) releaseAttack();
     if (stick.id !== null && !Array.from(event.touches).some(t=>ui.stick.contains(t.target))) releaseStick();
   }
   for (const name of ['touchstart','touchmove','touchend','touchcancel']) {
@@ -1498,23 +1544,37 @@
   ui.dash.addEventListener('keydown', event => {
     if (event.key === 'Enter' || event.key === ' ') dash();
   });
-  ui.sweep.addEventListener('pointerdown', event => {
-    if (event.button !== 0) return;
+  function swingHeld() {
+    if (heldAttack.element === ui.sweep) {
+      swingForward();
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const origin = viewOrigin();
+    const x = origin.x + (heldAttack.x - rect.left) * canvas.width / rect.width;
+    const y = origin.y + (heldAttack.y - rect.top) * canvas.height / rect.height;
+    const aim = toward(hero, { x, y });
+    swingBroom(aim.x || aim.y ? aim : hero.facing);
+  }
+  function beginAttack(event) {
+    const element = event.currentTarget;
+    if (mode !== 'playing' || event.button !== 0 || (element === canvas && event.pointerType !== 'mouse')) return;
     event.preventDefault();
-    swingForward();
+    releaseAttack();
+    ui.game.focus({ preventScroll:true });
+    heldAttack = {element,id:event.pointerId,touch:event.pointerType==='touch',x:event.clientX,y:event.clientY};
+    element.setPointerCapture(event.pointerId);
+    swingHeld();
+  }
+  for (const element of [canvas, ui.sweep]) element.addEventListener('pointerdown',beginAttack);
+  canvas.addEventListener('pointermove',event=>{
+    if (heldAttack?.id !== event.pointerId) return;
+    if (!(event.buttons & 1)) { releaseAttack(); return; }
+    heldAttack.x=event.clientX;
+    heldAttack.y=event.clientY;
   });
   ui.sweep.addEventListener('click', event => {
     if (event.detail === 0) swingForward();
-  });
-  canvas.addEventListener('pointerdown', event => {
-    if (event.pointerType !== 'mouse' || event.button !== 0 || mode !== 'playing') return;
-    ui.game.focus({ preventScroll: true });
-    const rect = canvas.getBoundingClientRect();
-    const origin = viewOrigin();
-    const x = origin.x + (event.clientX - rect.left) * canvas.width / rect.width;
-    const y = origin.y + (event.clientY - rect.top) * canvas.height / rect.height;
-    const aim = toward(hero, { x, y });
-    swingBroom(aim.x || aim.y ? aim : hero.facing);
   });
 
   ui.game.tabIndex = -1;

@@ -211,3 +211,5 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 3px; }
 .build-book select {width:100%;min-width:0;padding:5px 2px;color:var(--text);background:#352a40;border:1px solid #826e91;}
 .build-book fieldset p {grid-column:1/-1;margin:4px 0;font-size:12px;}
 .build-book>p {margin:0;font-size:11px;color:var(--mint);}
+
+#combat {margin-top:3px;max-width:min(47vw,245px);white-space:pre-line;font-variant-numeric:tabular-nums;line-height:1.35;color:#ece1dc;background:#15111b9c;padding:2px 4px;}

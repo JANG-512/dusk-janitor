@@ -1,7 +1,7 @@
 const prefix = 'dusk-janitor:' + self.registration.scope + ':';
-const release = prefix + '8';
+const release = prefix + '9';
 const files = [
-  'index.html', 'style.css?v=8', 'game.js?v=8', 'dungeon.js?v=4', 'art.js?v=7',
+  'index.html', 'style.css?v=9', 'game.js?v=9', 'dungeon.js?v=4', 'art.js?v=7',
   'scene.js?v=4', 'manifest.webmanifest', 'icons/broom-180.png', 'icons/broom-192.png', 'icons/broom-512.png'
 ];
 const urls = files.map(path => new URL(path, self.registration.scope).href);

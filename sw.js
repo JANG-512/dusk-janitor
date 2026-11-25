@@ -1,8 +1,8 @@
 const prefix = 'dusk-janitor:' + self.registration.scope + ':';
-const release = prefix + '13';
+const release = prefix + '14';
 const files = [
-  'index.html', 'fonts/galmuri.css', 'fonts/OFL.md', 'style.css?v=13', 'game.js?v=13', 'dungeon.js?v=13', 'art.js?v=13',
-  'scene.js?v=13', 'manifest.webmanifest', 'icons/broom-180.png', 'icons/broom-192.png', 'icons/broom-512.png'
+  'index.html', 'fonts/galmuri.css', 'fonts/OFL.md', 'style.css?v=14', 'language.js?v=14', 'game.js?v=14', 'dungeon.js?v=14', 'art.js?v=14',
+  'scene.js?v=14', 'manifest.webmanifest', 'icons/broom-180.png', 'icons/broom-192.png', 'icons/broom-512.png'
 ];
 const urls = files.map(path => new URL(path, self.registration.scope).href);
 self.addEventListener('install', event => {

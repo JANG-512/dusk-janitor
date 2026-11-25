@@ -226,7 +226,7 @@ const DuskArt = (() => {
     ['      lll      ', '     lgggl     ', '      gig      ', '    iiigiii    ', '   iggiiiggi   ', '  diiiiiiiiid  ', '   ibbbbb b i  ', '   i b    b i  ', '   i  llll  i  ', '  iillLLllliii ', ' diiigggggiiid ', '  dbiibbiibbd  ', '  diibbiibbid  '],
     ['     gggg      ', '   bbGGGGbbb   ', '  bBGGBBBGGBb  ', '  bBGGBBBGGBb  ', '  bgggggggggb  ', '  dBBBgigBBBd  ', '  dBGBgigBGBd  ', '  dBGGBBBGGBd  ', '  dbbbbbbbbbd  ', '   dd     dd   ']
   ];
-  function drawStation(ctx, station, time) {
+  function drawStation(ctx, station, time, role) {
     const {x, y, kind, used} = station;
     const palette = { b:'#6f4754', B:'#a06759', d:'#392e41', g:'#c89763', G:'#d99a73', i:'#9090a1', l:'#86cbb4', L:'#def9c3' };
     pixelEllipse(ctx, x + 2, y, 17, 5, '#24213299');
@@ -237,6 +237,17 @@ const DuskArt = (() => {
         if (color) rect(ctx, x - 16 + ix * 2, y - rows.length * 2 + iy * 2, 2, 2, color);
       }
     });
+    if (kind===0 && !used) {
+      if (role==='keeper') {
+        rect(ctx,x-6,y-14,9,5,'#497879');
+        rect(ctx,x-4,y-13,5,2,'#292d39');
+        rect(ctx,x+3,y-14,5,2,'#e6bd72');
+      } else {
+        rect(ctx,x-8,y-13,13,2,'#bc9875');
+        rect(ctx,x+4,y-15,3,6,role==='sweeper'?'#80beb2':'#c49157');
+        for(let i=0;i<3;i++) rect(ctx,x+7,y-15+i*2,3,1,role==='sweeper'?'#cce7d6':'#eac684');
+      }
+    }
     if (!used) {
       const top = y - rows.length * 2 - 7 + Math.round(Math.sin(time * 4) * 2);
       rect(ctx,x-1,top,3,5,'#ffdc97');
@@ -352,7 +363,8 @@ const DuskArt = (() => {
       const muzzle = Math.min(stroke.reach,14-3*kick);
       if (phase < .83 && stroke.reach > muzzle) {
         const length = stroke.reach-muzzle;
-        R(muzzle,-1,length,3,'#59abda');
+        const extra=Math.round(((stroke.jetWidth ?? 10)-10)/2);
+        R(muzzle,-1-extra,length,3+extra*2,'#59abda');
         R(muzzle,0,length,1,'#dcfff6');
         for(let x=muzzle+3;x<stroke.reach;x+=7)
           R(x,Math.sin(x+phase*15)*2,2,1,'#a8eaf0');

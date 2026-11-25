@@ -271,3 +271,11 @@ input, select, option {font-family:inherit;}
 .crew-banner {display:block;width:min(100%,520px);height:auto;max-height:18vh;object-fit:contain;margin:0 auto 14px;image-rendering:pixelated;}
 .modal[data-screen="title"] .dialog {padding-block:clamp(14px,4vh,38px);}
 @media(max-height:480px){.crew-banner{max-height:15vh;margin-bottom:6px;}.modal[data-screen="title"] .dialog{padding-block:9px;}}
+.bench-part {flex:1 1 128px;display:grid;align-content:start;gap:6px;padding:12px;text-align:left;color:#f2e8dc;background:#282b32;border:1px solid #93836e;}
+.bench-part:hover:not(:disabled),.bench-part:focus-visible {background:#394047;border-color:#ebc889;}
+.bench-part small {color:#b7b0a8;font-size:11px;}
+.bench-part span {font-size:12px;line-height:1.4;}
+.bench-part strong {color:#a7e5c7;}
+.bench-part:disabled {opacity:.55;}
+#dialog-actions:has(.bench-part) .secondary {flex-basis:100%;}
+@media(max-width:480px){.bench-part{flex-basis:100%;grid-template-columns:1fr auto;align-items:center;gap:3px 8px;}.bench-part small{grid-column:2;grid-row:1;}.bench-part b{grid-column:1;grid-row:1;}}

@@ -160,7 +160,7 @@
       run = {
         bossLevel: 0, cardKills: 0, time: 0, kills: 0, allies: 0, streak: 0, mercy: 0, clean: 0, id: 0,
         xp: 0, need: 7, level: 1, weapons: { broom: 1 }, bonus: {}, timers: {}, shake: 0,
-        charges: [], blastKills: 0, catalyst: 0, echo: 0, extension: 0, swings: 0, shield: false, fieldAt: -1, fieldCooldown: 0, hints: 0
+        charges: [], blastKills: 0, mods: {}, safeJets: 0, swings: 0, shield: false, fieldAt: -1, fieldCooldown: 0, hints: 0
       };
       run.circuits = [role==='alchemist' ? circuit('special','mine','heavy') : role==='keeper' ? circuit('special','darts','fast') : circuit('special','frost','wide')];
       hero.role = role;
@@ -321,8 +321,6 @@
     const slot = document.createElement('div');
     slot.className = 'slot' + (level ? ' active' : '');
     slot.title = weaponData[name].label + (level ? ' Lv. ' + level : ' · 잠김');
-    if (name === 'broom' && run.extension) slot.title += ' · 사거리 +' + run.extension;
-    if (name === 'broom' && run.echo) slot.title += ' · 공명 피해 ' + run.echo;
     slot.setAttribute('role', 'img');
     const description = slot.title;
     DuskLanguage.bind(slot, 'title', description);
@@ -343,8 +341,6 @@
     if (role === 'sweeper') specials.push('깨끗한 바닥 '+run.polishKills+'/'+(6-talent(2)));
     if (role === 'alchemist') specials.push('모래바람 '+(18+4*talent(1))+'%');
     if (run.repairUntil > run.time) specials.push('호스 수리 '+remaining(run.repairUntil-run.time));
-    if (run.echo) specials.push('공명 '+(3-run.swings%3)+'회 후');
-    if (run.catalyst) specials.push('기폭제 '+(4-run.swings%4)+'회 후');
     if (run.weapons.soap) specials.push('비눗방울 접촉 간격 '+soapInterval+'초/적');
     const lines = [(settings.auto ? '자동' : '수동')+' · 공속 '+(1/attackInterval(roles[role].interval)).toFixed(2)+'회/초',tools.join(' · ')];
     if (specials.length) lines.push(specials.join(' · '));
@@ -470,7 +466,7 @@
     const encounter = boss ? (boss.bossLevel === 50 ? '황혼의 종지기' : '자정의 종지기')+' · '+boss.hp+'/'+boss.maxHp : currentRoom.state === 'clean' ? '이 구역 정화 완료' :
       '무리 ' + currentRoom.spawned + ' / ' + currentRoom.batches + ' · 정화 ' + Math.round(currentRoom.resolved / currentRoom.total * 100) + '%';
     if (uiState.encounter !== encounter) DuskLanguage.bind(ui.encounter, 'text', uiState.encounter = encounter);
-    const weapons = Object.keys(weaponData).map(key => run.weapons[key] ?? 0).concat(run.extension, run.echo).join('/');
+    const weapons = Object.keys(weaponData).map(key => run.weapons[key] ?? 0).join('/');
     if (uiState.weapons !== weapons) {
       uiState.weapons = weapons;
       ui.loadout.replaceChildren(...Object.keys(weaponData).map(key => iconBox(key, run.weapons[key])));
@@ -518,6 +514,30 @@
     else ui.game.focus({ preventScroll: true });
   }
 
+  // Values shown on the bench are also used by the combat simulation.
+  const parts = {
+    wax:    {name:'보존 왁스', stat:'새 바닥 지속 시간', base:13, step:4, unit:'s'},
+    glide:  {name:'저마찰 패드', stat:'적 미끄럼 시간', base:.52, step:.16, unit:'s'},
+    edge:   {name:'고무 밀대날', stat:'미끄러지는 적 추가 피해', base:0, step:1},
+    spring: {name:'반동 손잡이', stat:'카운터 시 공격 대기시간 환급', base:0, step:12, unit:'%'},
+    gust:   {name:'삼중 빗살', stat:'모래바람이 세 번째 적까지 노릴 확률', base:50, step:15, unit:'%'},
+    sieve:  {name:'집진망', stat:'모래바람 탐색 반경', base:90, step:14, unit:'px'},
+    fan:    {name:'부채꼴 노즐', stat:'물줄기 타격·세척 폭', base:10, step:4, unit:'px'},
+    sleeve: {name:'꺾임 방지 슬리브', stat:'수리 직후 고장 없는 분사 횟수', base:1, step:3},
+    pump:   {name:'축압 펌프', stat:'세 번째 분사 추가 피해', base:0, step:1}
+  };
+  const benchParts = {sweeper:['wax','glide','edge'], alchemist:['spring','gust','sieve'], keeper:['fan','sleeve','pump']};
+  const maxPartLevel=3;
+
+  function partValue(key, level=run.mods[key] || 0) {
+    const part=parts[key];
+    const extra=key==='sieve' ? 18*talent(2) : 0;
+    return part.base+extra+part.step*level;
+  }
+  function partReading(key,level) {
+    return Number(partValue(key,level).toFixed(2))+(parts[key].unit || '');
+  }
+
   const stationNames = ['수리 작업대', '샘물 제단', '청소부의 보급함'];
   function nearbyStation() {
     const station = currentRoom.station;
@@ -530,6 +550,7 @@
     if (!station) return;
     function reward(label, apply) {
       return action(label, () => {
+        if (mode!=='station' || station.used || station!==nearbyStation()) return;
         station.used = true;
         apply();
         burst(station.x, station.y - 12, '#e9c885', 24, 55);
@@ -541,11 +562,30 @@
     }
     let options;
     if (station.kind === 0) {
-      options = [
-        reward('기폭제 · 정화탄 룬 +1 · 네 번째 빗질 폭발 피해 '+(3+run.catalyst), () => { run.catalyst++; }),
-          reward('빗살 연장 · 빗질 사거리와 빗질 룬 반경 +12', () => { run.extension += 12; }),
-        reward('공명 손잡이 · 공명과 충격파 룬 피해 +2', () => { run.echo += 2; })
-      ];
+      options = benchParts[role].map(key=>{
+        const part=parts[key], level=run.mods[key] || 0;
+        const full=level>=maxPartLevel;
+        const reading=partReading(key,level)+(full ? '' : ' → '+partReading(key,level+1));
+        const label=part.name+' · '+part.stat+' '+reading;
+        const button=reward(label,()=>{
+          run.mods[key]=level+1;
+          if (role==='keeper' && run.repairUntil>run.time) {
+            run.repairUntil=run.time;
+            run.timers.broom=0;
+            run.safeJets=partValue('sleeve');
+          }
+        });
+        button.className='bench-part';
+        button.disabled=full;
+        button.replaceChildren();
+        for (const [tag,text] of [['small','Lv.'+level+'/'+maxPartLevel],['b',part.name],['span',part.stat],['strong',reading]]) {
+          const line=document.createElement(tag);
+          DuskLanguage.bind(line,'text',text);
+          button.append(line);
+        }
+        return button;
+      });
+      if (options.every(button=>button.disabled)) options.push(reward('예비 부품 교환 · 경험치 +8',()=>{run.xp+=8;}));
     } else if (station.kind === 1) {
       options = [reward('샘물 마시기 · 최대 체력 +1, 체력 3 회복', () => {
         hero.max++;
@@ -561,7 +601,10 @@
       }));
     }
     options.push(action('나중에', resume, true));
-    dialog('station', currentRoom.theme.name, stationNames[station.kind], '이곳에서는 한 번만 보상을 받을 수 있습니다.', options);
+    const bench=station.kind===0;
+    const detail=bench ? '부품 하나를 장착합니다. 개조는 다음 지역에도 유지됩니다.' : '이곳에서는 한 번만 보상을 받을 수 있습니다.';
+    dialog('station', bench ? roles[role].name+' · '+roles[role].weapon : currentRoom.theme.name, stationNames[station.kind], detail, options);
+    if (bench) options.find(button=>!button.disabled).focus();
   }
 
   function applySettings(save = true) {
@@ -783,8 +826,8 @@
   function specs(slot) {
     const {style,formula} = slot;
     return {
-      power: (formula === 'mine' ? 1 + run.catalyst : formula === 'nova' ? run.echo : 0) + (style === 'heavy' ? 4 : style === 'fast' ? 1 : 2) + (run.bonus.coil ?? 0),
-      radius: Math.round(((style === 'wide' ? 72 : 48) + (slot.trigger === 'broom' ? run.extension : 0)) * (1 + .15*(run.bonus.lens ?? 0))),
+      power: (formula === 'mine' ? 1 : 0) + (style === 'heavy' ? 4 : style === 'fast' ? 1 : 2) + (run.bonus.coil ?? 0),
+      radius: Math.round((style === 'wide' ? 72 : 48) * (1 + .15*(run.bonus.lens ?? 0))),
       delay: formulas[formula][2] * (style === 'heavy' ? 1.45 : style === 'fast' ? .55 : 1) * .9**(run.bonus.relay ?? 0)
     };
   }
@@ -855,7 +898,7 @@
       const preview=document.createElement('p');
       const refresh=()=>{
         const stats=specs(slot);
-        const prerequisite = {spray:'분무기 탄환이 필요합니다. ', ally:'임시 동료가 필요합니다. ', blast:'오염 통, 기폭제 또는 앞 슬롯의 정화탄 폭발로 발동합니다. '}[slot.trigger] ?? '';
+        const prerequisite = {spray:'분무기 탄환이 필요합니다. ', ally:'임시 동료가 필요합니다. ', blast:'오염 통 또는 앞 슬롯의 정화탄 폭발로 발동합니다. '}[slot.trigger] ?? '';
         DuskLanguage.bind(preview, 'text', prerequisite + formulas[slot.formula][1]+' 피해 '+stats.power+' · 반경 '+stats.radius+' · 재사용 '+stats.delay.toFixed(1)+'초 · 발동 '+slot.count+'회');
       };
       for(const [key,label,items] of [['trigger','조건',{...triggers,special:signatureEvents[role]}],['formula','효과',formulas],['style','개조',styles]]) {
@@ -875,10 +918,14 @@
     const inventory=document.createElement('p');
     const owned=[...Object.entries(weaponData).map(([key,data])=>[data.label,run.weapons[key]]),
       ...[...utility,...modules].map(data=>[data.label,run.bonus[data.key]]),
-      ...roles[role].paths.map(([name],i)=>[name,run.bonus[role+i]]),
-      ['빗살 추가 사거리',run.extension], ['공명 피해',run.echo], ['기폭제 피해',run.catalyst && 2+run.catalyst]];
+      ...roles[role].paths.map(([name],i)=>[name,run.bonus[role+i]])];
     DuskLanguage.bind(inventory, 'text', (run.level<4?'Lv.4에서 두 번째 슬롯 개방 · ':'')+owned.filter(([,lv])=>lv).map(([name,lv])=>name+' '+lv).join(' · '));
     book.append(inventory);
+    for (const key of benchParts[role].filter(key=>run.mods[key])) {
+      const line=document.createElement('p');
+      DuskLanguage.bind(line,'text',parts[key].name+' Lv.'+run.mods[key]+' · '+parts[key].stat+' '+partReading(key,run.mods[key]));
+      book.append(line);
+    }
     ui['dialog-actions'].prepend(book);
   }
 
@@ -1084,7 +1131,7 @@
     run.kills++;
     if (role === 'sweeper' && ++run.polishKills >= 6-talent(2)) {
       run.polishKills = 0;
-      run.slicks.push({x:m.x, y:m.y, radius:24+5*talent(1), until:run.time+13});
+      run.slicks.push({x:m.x, y:m.y, radius:24+5*talent(1), until:run.time+partValue('wax')});
       burst(m.x,m.y,'#acf5e1',15,40);
     }
     if (++run.cardKills >= cardInterval()) {
@@ -1157,7 +1204,7 @@
   const talent = index => run.bonus[role+index] || 0;
   function weaponReach() {
     const bonus = role === 'keeper' ? 14 : role === 'sweeper' ? 12 : 0;
-    return roles[role].reach + bonus * talent(0) + 3 * run.weapons.broom + run.extension;
+    return roles[role].reach + bonus * talent(0) + 3 * run.weapons.broom;
   }
   const soapInterval = .55;
   function attackInterval(base) {
@@ -1184,21 +1231,21 @@
     const broom = run.weapons.broom;
     if (run.repairUntil > run.time) return;
     const hose = role === 'keeper';
-    if (hose && run.swings > 0 && !run.justRepaired && Math.random() < .06-.01*talent(1)) {
+    if (hose && run.swings > 0 && run.safeJets===0 && Math.random() < .06-.01*talent(1)) {
       run.repairUntil = run.time + 1.45-.22*talent(2);
       run.timers.broom = run.repairUntil-run.time;
-      run.justRepaired = true;
+      run.safeJets = partValue('sleeve');
       hero.stroke = null;
       announce('호스 수리',run.timers.broom);
       tone(150,57,.14,'square');
       return;
     }
-    run.justRepaired = false;
+    if (hose && run.safeJets>0) run.safeJets--;
     let reach = weaponReach();
     for (let step=3;step<=reach;step+=3) {
       if (!feetFree(hero.x+aim.x*step,hero.y+aim.y*step,0)) {reach=step-3;break;}
     }
-    const halfWidth = role === 'alchemist' ? 11 : hose ? 5 : 7;
+    const halfWidth = role === 'alchemist' ? 11 : hose ? partValue('fan')/2 : 7;
     const hit = point => {
       const dx=point.x-hero.x, dy=point.y-hero.y;
       const forward=dx*aim.x+dy*aim.y;
@@ -1208,35 +1255,30 @@
     const end = {x:hero.x+aim.x*reach,y:hero.y+aim.y*reach};
     hero.stroke = {
       start:run.time, duration:Math.min(attackInterval(roles[role].interval), hose ? .19 : .34),
-      dx:aim.x, dy:aim.y, reach
+      dx:aim.x, dy:aim.y, reach, jetWidth:hose ? halfWidth*2 : 0
     };
     if (hose) washStripe(hero,end);
     cooldown('broom',roles[role].interval);
     run.swings++;
-    if (run.echo && run.swings % 3 === 0) {
-      effects.push({kind:'ring', x:hero.x, y:hero.y-4, radius:reach, life:.38, full:.38, color:'#9cebc2'});
-      for (const m of hostiles()) {
-        if (distance(hero,m) <= reach && clearLine(hero,m)) damageMonster(m,run.echo,hero,true,-1,'공명');
-      }
-    }
     for (const room of dungeon.rooms) {
       for (const keg of room.casks) {
         if (!keg.used && hit(keg)) ignite(keg);
       }
     }
-    let primed = run.catalyst > 0 && run.swings % 4 === 0;
+
     if (hose) tone(610,310,.075,'triangle');
     else if (role==='sweeper') tone(340,130,.13);
     else tone(235,94,.08,'square');
     for (const m of hostiles()) {
       if (!hit(m) || m.hp<=0 || m.fear>0) continue;
       const counter = role==='alchemist' && (m.windup>0 || m.rush>0);
-      if (primed) {
-        arm(m,42,.35,2+run.catalyst);
-        primed=false;
-      }
-      damageMonster(m,broom+(counter ? 1+talent(0) : 0),hero,true,-1,counter?'카운터':roles[role].weapon);
+      let damage=broom;
+      if (counter) damage+=1+talent(0);
+      if (role==='sweeper' && m.slipUntil>run.time) damage+=partValue('edge');
+      if (hose && run.swings%3===0) damage+=partValue('pump');
+      damageMonster(m,damage,hero,true,-1,counter?'카운터':roles[role].weapon);
       if (counter) {
+        run.timers.broom=attackInterval(roles[role].interval)*(1-partValue('spring')/100);
         if (Math.random()<.18+.04*talent(1)) sandstorm(m);
         circuitEvent('special',m);
       }
@@ -1253,7 +1295,7 @@
       brush.scale(core.sprite.width/138,core.sprite.height/88);
       brush.translate(69-core.x,44-core.y);
       brush.globalCompositeOperation='destination-out';
-      brush.lineWidth=10;
+      brush.lineWidth=partValue('fan');
       brush.lineCap='round';
       brush.beginPath();brush.moveTo(start.x,start.y);brush.lineTo(end.x,end.y);brush.stroke();
       brush.restore();
@@ -1261,9 +1303,9 @@
   }
 
   function sandstorm(center) {
-    const radius=90+18*talent(2);
+    const radius=partValue('sieve');
     const victims=hostiles().filter(m=>!m.bossLevel && !m.warden && distance(center,m)<=radius && clearLine(center,m))
-      .sort((a,b)=>distance(center,a)-distance(center,b)).slice(0,Math.random()<.5?2:3);
+      .sort((a,b)=>distance(center,a)-distance(center,b)).slice(0,Math.random()<1-partValue('gust')/100 ? 2 : 3);
     effects.push({kind:'gust',x:center.x,y:center.y,radius:32,life:.6,full:.6});
     tone(340,65,.28,'sawtooth');
     for (const m of victims) {
@@ -1363,7 +1405,7 @@
     }
     if (!m.bossLevel && !(m.slipReady > run.time) && run.slicks.some(s => distance(m,s)<s.radius)) {
       m.slide = toward(m,hero);
-      m.slipUntil = run.time+.52;
+      m.slipUntil = run.time+partValue('glide');
       m.slipReady = run.time+1.4;
       m.rush=m.windup=0;
       burst(m.x,m.y,'#b3fff0',5,22);
@@ -1563,7 +1605,7 @@
     updateHero(dt);
     const station = nearbyStation();
     ui.interact.hidden = !station;
-    if (station) DuskLanguage.bind(ui.interact, 'text', 'E · ' + stationNames[station.kind]);
+    if (station) DuskLanguage.bind(ui.interact, 'text', (matchMedia('(pointer: coarse)').matches ? '' : 'E · ') + stationNames[station.kind]);
     camera.x = Math.round(hero.x);
     camera.y = Math.round(hero.y);
     if (currentRoom.state === 'active' && currentRoom.spawned < currentRoom.batches) {
@@ -1759,7 +1801,7 @@
         if (!keg.used) actors.push({y:keg.y, paint:() => DuskArt.drawKeg(ctx,keg.x,keg.y,run.time)});
       }
       const station = room.station;
-      actors.push({ y: station.y, paint: () => DuskArt.drawStation(ctx, station, run.time) });
+      actors.push({ y: station.y, paint: () => DuskArt.drawStation(ctx, station, run.time, role) });
       for (const prop of room.props) {
         if (inView(prop[1], prop[2])) actors.push({ y: prop[2], paint: () => drawProp(ctx, prop, room.theme, Number(room.state === 'clean'), run.time) });
       }
@@ -1860,7 +1902,7 @@
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     if (key === 'Tab' && !ui.modal.hidden) {
-      const items = [...ui['dialog-actions'].querySelectorAll('button,input,select')];
+      const items = [...ui['dialog-actions'].querySelectorAll('button:enabled,input:enabled,select:enabled')];
       const at = items.indexOf(document.activeElement);
       items[(at + (event.shiftKey ? items.length - 1 : 1)) % items.length].focus();
       event.preventDefault();

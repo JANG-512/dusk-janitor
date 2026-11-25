@@ -44,6 +44,9 @@
     keeper: {name:'모아 · 정령지기', color:'#ad96ec', icon:'soap', start:'회전 비눗방울을 지니고, 무피격 2연속 처치부터 동료를 모읍니다.', paths:[
       ['무리 훈련','임시 동료의 공격 피해 +1'], ['수호 궤도','비눗방울 접촉 피해 +1']]}
   };
+  let hardMode = false;
+  let hardUnlocked = false;
+  try { hardUnlocked = localStorage.getItem('dusk-hard') === '1'; } catch {}
   let role = 'sweeper';
   const defaults = { auto:false, sound:false, volume:65, shake:true, damage:true, particles:100, map:true, zoom:100, left:false, sensitivity:100, opacity:85 };
   let settings = {...defaults};
@@ -135,7 +138,7 @@
         facing: { x: 0, y: -1 }, invulnerable: 0, dash: 0, dashCooldown: 0
       };
       run = {
-        time: 0, kills: 0, allies: 0, streak: 0, mercy: 0, clean: 0, id: 0,
+        bossLevel: 0, cardKills: 0, time: 0, kills: 0, allies: 0, streak: 0, mercy: 0, clean: 0, id: 0,
         xp: 0, need: 7, level: 1, weapons: { broom: 1 }, bonus: {}, timers: {}, shake: 0,
         charges: [], blastKills: 0, catalyst: 0, echo: 0, extension: 0, swings: 0, shield: false, fieldAt: -1, fieldCooldown: 0, hints: 0
       };
@@ -190,6 +193,7 @@
     ui.pause.setAttribute('aria-label', '일시 정지');
     resetInput();
     activate(currentRoom, true);
+    if (run.bossLevel) spawnBatch(currentRoom,run.bossLevel);
     announce((travel ? '다음 지역 도착 · ' : '탐험 시작 · ') + dungeon.region.name, 4.2);
     updateHud();
     ui.game.focus({ preventScroll: true });
@@ -250,11 +254,13 @@
     return true;
   }
 
-  function spawnBatch(room) {
-    room.spawned++;
-    room.next = room.id === 0 ? 8.5 : 7.2;
+  function spawnBatch(room, bossLevel = 0) {
+    if (!bossLevel) {
+      room.spawned++;
+      room.next = room.id === 0 ? 8.5 : 7.2;
+    }
     const offset = Math.floor(Math.random() * room.cores.length);
-    for (let i = 0; i < room.batchSize; i++) {
+    for (let i = 0; i < (bossLevel ? 1 : room.batchSize); i++) {
       const core = room.cores[(i + offset) % room.cores.length];
       let x = core.x;
       let y = core.y;
@@ -267,14 +273,16 @@
         y = py;
         break;
       }
-      const warden = room === dungeon.exit && room.spawned === room.batches && i === 0;
+      const warden = !!bossLevel || room === dungeon.exit && room.spawned === room.batches && i === 0;
       const spore = !warden && room.spawned >= 2 && i === 0;
-      if (warden) announce('종지기 출현 · 바닥의 붉은 종소리를 피하세요', 4);
+      if (bossLevel) announce(bossLevel === 50 ? '중간 보스 · 황혼의 종지기 출현' : '최종 보스 · 자정의 종지기 출현', 6);
+      else if (warden) announce('종지기 출현 · 바닥의 붉은 종소리를 피하세요', 4);
       const breed = i===1 ? ['prism','mender','crab'][(room.id+room.spawned-1)%3] : '';
       const type = breed==='prism' ? 1 : breed==='crab' ? 2 : breed==='mender' ? 0 : warden ? 2 : spore ? 1 : room.id === 0 && room.spawned === 1 ? (i === 3 ? 1 : 0) : i % 5 === 3 ? 2 : i % 4 === 1 ? 1 : 0;
-      const maxHp = (warden ? 24 : spore ? 5 : [2, 3, 4][type]) + Math.floor(room.tier / 3);
+      const baseHp = (bossLevel || (warden ? 24 : spore ? 5 : [2, 3, 4][type]) + Math.floor(room.tier / 3));
+      const maxHp = Math.ceil(baseHp * (1 + .045 * (run.level - 1)) * (hardMode ? 1.5 : 1));
       monsters.push({
-        id: run.id++, room, x, y, type, warden, spore, breed, shell:breed==='crab', specialTimer: 1.8, hp: maxHp, maxHp, fear: 0, friendly: false,
+        id: run.id++, room, x, y, type, bossLevel, warden, spore, breed, shell:breed==='crab', specialTimer: 1.8, hp: maxHp, maxHp, fear: 0, friendly: false,
         cooldown: .65 + Math.random() * .7, windup: 0, recoil: 0, rush: 0, flash: 0, grace: .45,
         aim: { x: 0, y: 0 }, soapHit: 0
       });
@@ -320,11 +328,11 @@
     if (uiState.combatText !== display) ui.combat.textContent = uiState.combatText = display;
   }
 
-  const cardInterval = 12;
+  const cardInterval = () => 18 + 2 * Math.floor((run.level - 1) / 3);
   const deck = [
-    {name:'새벽의 종', kind:'축복', desc:'현재 화면에 보이는 적을 모두 처치합니다. 동료는 보호됩니다.', play(){
+    {name:'새벽의 종', kind:'축복', desc:'현재 화면에 보이는 적(레벨 보스 제외)을 모두 처치합니다. 동료는 보호됩니다.', play(){
       const {x,y}=viewOrigin();
-      const visible = monsters.filter(m => m.hp>0 && !m.friendly &&
+      const visible = monsters.filter(m => m.hp>0 && !m.bossLevel && !m.friendly &&
         m.x>=x && m.x<x+canvas.width && m.y>=y && m.y<y+canvas.height &&
         (run.fogUntil<=run.time || distance(hero,m)<=95));
       for (const m of visible) {
@@ -371,25 +379,30 @@
       const button=action('',()=>{
         const index=run.hand.indexOf(id);
         if(mode!=='cards' || index<0) return;
+        if (run.bossLevel && card.name === '접힌 지도') {
+          announce('보스 정화 후 이동할 수 있습니다');
+          resume();
+          return;
+        }
         run.hand.splice(index,1);
         resume();
         card.play();
         burst(hero.x,hero.y-8,'#ead6a9',18,45);
         updateHud();
         announce(card.name+' 사용',2.5);
-        if (run.xp >= run.need) levelUp();
+        if (!run.bossLevel && run.xp >= run.need) levelUp();
       });
       button.className='choice';
       button.innerHTML='<b>'+card.name+' ×'+count+'</b><small>'+card.kind+' · '+card.desc+'</small>';
       return button;
     });
     buttons.push(action('닫기',resume,true));
-    dialog('cards','달안개 카드','카드 손패','12마리마다 한 장을 뽑습니다. 축복과 지도는 골라 쓰고, 저주는 즉시 발동합니다.',buttons);
+    dialog('cards','달안개 카드','카드 손패','현재 레벨에서는 '+cardInterval()+'마리마다 한 장을 뽑습니다. 축복과 지도는 골라 쓰고, 저주는 즉시 발동합니다.',buttons);
   }
 
   function updateHud() {
     updateCombatHud();
-    const handText='카드 '+run.hand.length+' · '+(run.kills%cardInterval)+'/'+cardInterval;
+    const handText='카드 '+run.hand.length+' · '+run.cardKills+'/'+cardInterval();
     if(ui.cards.textContent!==handText) ui.cards.textContent=handText;
     if (uiState.blastKills !== run.blastKills) {
       uiState.blastKills = run.blastKills;
@@ -402,7 +415,7 @@
     }
     if (uiState.room !== currentRoom.id) {
       uiState.room = currentRoom.id;
-      ui.region.textContent = (dungeon.regionIndex + 1) + '구역 · ' + currentRoom.theme.name;
+      ui.region.textContent = (hardMode ? '하드 · ' : '') + (dungeon.regionIndex + 1) + '구역 · ' + currentRoom.theme.name;
     }
     if (uiState.clean !== run.clean) {
       uiState.clean = run.clean;
@@ -421,7 +434,8 @@
     }
     if (uiState.kills !== run.kills) ui.kills.textContent = uiState.kills = run.kills;
     if (uiState.allies !== run.allies) ui.party.textContent = uiState.allies = run.allies;
-    const encounter = currentRoom.state === 'clean' ? '이 구역 정화 완료' :
+    const boss = run.bossLevel && monsters.find(m => m.bossLevel && m.hp > 0);
+    const encounter = boss ? (boss.bossLevel === 50 ? '황혼의 종지기' : '자정의 종지기')+' · '+boss.hp+'/'+boss.maxHp : currentRoom.state === 'clean' ? '이 구역 정화 완료' :
       '무리 ' + currentRoom.spawned + ' / ' + currentRoom.batches + ' · 정화 ' + Math.round(currentRoom.resolved / currentRoom.total * 100) + '%';
     if (uiState.encounter !== encounter) ui.encounter.textContent = uiState.encounter = encounter;
     const weapons = Object.keys(weaponData).map(key => run.weapons[key] ?? 0).concat(run.extension, run.echo).join('/');
@@ -495,9 +509,9 @@
     let options;
     if (station.kind === 0) {
       options = [
-        reward('기폭제 · 네 번째 타격에 지연 폭발', () => { run.catalyst++; }),
-          reward('빗살 연장 · 사거리 +12', () => { run.extension += 12; }),
-        reward('공명 손잡이 · 세 번째 타격에 파동 +2', () => { run.echo += 2; })
+        reward('기폭제 · 정화탄 룬 +1 · 네 번째 빗질 폭발 피해 '+(3+run.catalyst), () => { run.catalyst++; }),
+          reward('빗살 연장 · 빗질 사거리와 빗질 룬 반경 +12', () => { run.extension += 12; }),
+        reward('공명 손잡이 · 공명과 충격파 룬 피해 +2', () => { run.echo += 2; })
       ];
     } else if (station.kind === 1) {
       options = [reward('샘물 마시기 · 최대 체력 +1, 체력 3 회복', () => {
@@ -539,7 +553,8 @@
   function titleScreen() {
     const buttons = [];
     if (sessionStarted) buttons.push(action('탐험 이어하기',resume));
-    buttons.push(action(sessionStarted ? '새 탐험 준비' : '탐험 준비',selectRole),action('설정',()=>settingsScreen(titleScreen),true));
+    buttons.push(action(sessionStarted ? '새 탐험 준비' : '탐험 준비',()=>{hardMode=false;selectRole();}),action('설정',()=>settingsScreen(titleScreen),true));
+    if (hardUnlocked) buttons.push(action('하드모드 탐험',()=>{hardMode=true;selectRole();}));
     dialog('title','DUSK JANITOR','황혼의 청소부','달안개 마을의 마지막 야간 근무',buttons);
   }
   function selectRole() {
@@ -666,8 +681,8 @@
   function specs(slot) {
     const {style,formula} = slot;
     return {
-      power: (style === 'heavy' ? 4 : style === 'fast' ? 1 : 2) + (run.bonus.coil ?? 0),
-      radius: Math.round((style === 'wide' ? 72 : 48) * (1 + .15*(run.bonus.lens ?? 0))),
+      power: (formula === 'mine' ? 1 + run.catalyst : formula === 'nova' ? run.echo : 0) + (style === 'heavy' ? 4 : style === 'fast' ? 1 : 2) + (run.bonus.coil ?? 0),
+      radius: Math.round(((style === 'wide' ? 72 : 48) + (slot.trigger === 'broom' ? run.extension : 0)) * (1 + .15*(run.bonus.lens ?? 0))),
       delay: formulas[formula][2] * (style === 'heavy' ? 1.45 : style === 'fast' ? .55 : 1) * .9**(run.bonus.relay ?? 0)
     };
   }
@@ -684,12 +699,12 @@
       const targets = hostiles().filter(m=>distance(point,m)<=radius && clearLine(point,m));
       switch (slot.formula) {
         case 'mine':
-          arm(point,radius,.48,power+1,i,'정화탄');
+          arm(point,radius,.48,power,i,'정화탄');
           break;
         case 'darts':
           for (let ray=0;ray<8;ray++) {
             const a=ray*Math.PI/4;
-            shots.push({x:point.x,y:point.y,vx:Math.cos(a)*145,vy:Math.sin(a)*145,life:radius/95,
+            shots.push({x:point.x,y:point.y,vx:Math.cos(a)*145,vy:Math.sin(a)*145,life:radius/145,
               strength:power,friendly:true,sourceSlot:i,hits:new Set()});
           }
           break;
@@ -758,7 +773,8 @@
     const inventory=document.createElement('p');
     const owned=[...Object.entries(weaponData).map(([key,data])=>[data.label,run.weapons[key]]),
       ...[...utility,...modules].map(data=>[data.label,run.bonus[data.key]]),
-      ...roles[role].paths.map(([name],i)=>[name,run.bonus[role+i]])];
+      ...roles[role].paths.map(([name],i)=>[name,run.bonus[role+i]]),
+      ['빗살 추가 사거리',run.extension], ['공명 피해',run.echo], ['기폭제 피해',run.catalyst && 2+run.catalyst]];
     inventory.textContent=(run.level<4?'Lv.4에서 두 번째 슬롯 개방 · ':'')+owned.filter(([,lv])=>lv).map(([name,lv])=>name+' '+lv).join(' · ');
     book.append(inventory);
     ui['dialog-actions'].prepend(book);
@@ -767,6 +783,10 @@
   function levelUp() {
     run.xp -= run.need;
     run.level++;
+    if (run.level === 50 || run.level === 100) {
+      run.bossLevel = run.level;
+      spawnBatch(currentRoom, run.level);
+    }
     if(run.level===4) run.circuits.push(circuit('dash','frost','fast'));
     run.need = Math.floor(6 + run.level * 2.7);
     const tools = Object.entries(weaponData).filter(([key]) => (run.weapons[key] ?? 0) < 5)
@@ -963,7 +983,8 @@
       showFear(m);
     }
     run.kills++;
-    if (run.kills % cardInterval === 0) {
+    if (++run.cardKills >= cardInterval()) {
+      run.cardKills = 0;
       const id=Math.floor(Math.random()*deck.length);
       const card=deck[id];
       run.pendingReveals.push(id);
@@ -979,7 +1000,15 @@
 
       }
     }
-    m.room.resolved++;
+    if (m.bossLevel) {
+      run.bossLevel = 0;
+      if (m.bossLevel === 100) {
+        hardUnlocked = true;
+        try { localStorage.setItem('dusk-hard','1'); } catch {}
+        sessionStarted = false;
+        dialog('victory','LV.100','자정의 종지기 정화 완료','하드모드가 열렸습니다.',[action('제목 화면',titleScreen)]);
+      } else announce('황혼의 종지기 정화 완료', 5);
+    } else m.room.resolved++;
     placeGem(m);
     updateRoomClean(m.room);
     if(source!=='새벽의 종') circuitEvent('kill',m,sourceSlot);
@@ -1007,7 +1036,7 @@
       announce('샘물 부적이 피해를 막았습니다');
       return;
     }
-    hero.hp--;
+    hero.hp = Math.max(0, hero.hp - (1 + Math.floor((run.level - 1) / 25) + Number(hardMode)));
     hero.invulnerable = .95;
     run.streak = run.mercy = 0;
     run.shake = .25;
@@ -1073,7 +1102,7 @@
           arm(m,42 + 10*(run.bonus.alchemist1 ?? 0),.35,2 + run.catalyst);
           primed = false;
         }
-        damageMonster(m, 1 + Math.floor(broom / 2), hero);
+        damageMonster(m, broom, hero);
         circuitEvent('broom',m);
       }
     }
@@ -1101,7 +1130,7 @@
         for (let i = 0; i < (spray >= 3 ? 3 : 1); i++) {
           const angle = Math.atan2(aim.y, aim.x) + (i ? (i === 1 ? -.17 : .17) : 0);
           shots.push({ x: hero.x, y: hero.y, vx: Math.cos(angle) * 186, vy: Math.sin(angle) * 186,
-            life: .85, strength: 1 + Math.floor(spray / 2), friendly: true, hits: new Set() });
+            life: .85, strength: spray, friendly: true, hits: new Set() });
         }
         cooldown('spray', 1.12);
       }
@@ -1120,7 +1149,7 @@
       if (!tileFree(bubble.x, bubble.y)) continue;
       for (const m of visible) {
         if (m.soapHit <= 0 && distance(bubble, m) <= 11) {
-          damageMonster(m, Math.ceil(soap / 2) + (run.bonus.keeper1 ?? 0), bubble,true,-1,'비눗방울');
+          damageMonster(m, soap + (run.bonus.keeper1 ?? 0), bubble,true,-1,'비눗방울');
           m.soapHit = soapInterval;
         }
       }
@@ -1355,13 +1384,14 @@
     const station = nearbyStation();
     ui.interact.hidden = !station;
     if (station) ui.interact.textContent = 'E · ' + stationNames[station.kind];
-    camera.x += (hero.x - camera.x) * Math.min(1, dt * 8.5);
-    camera.y += (hero.y - camera.y) * Math.min(1, dt * 8.5);
+    camera.x = Math.round(hero.x);
+    camera.y = Math.round(hero.y);
     if (currentRoom.state === 'active' && currentRoom.spawned < currentRoom.batches) {
       currentRoom.next -= dt;
       if (currentRoom.next <= 0 || currentRoom.resolved >= currentRoom.spawned * currentRoom.batchSize) spawnBatch(currentRoom);
     }
     updateWeapons(dt);
+    if (mode !== 'playing') return;
     updateCharges(dt);
     if (mode !== "playing") return;
     for (const m of monsters) {
@@ -1382,11 +1412,11 @@
         room.cores[i].dirt = Math.max(goal, room.cores[i].dirt - dt * .75);
       }
     }
-    if (run.clean === dungeon.rooms.length) {
+    if (!run.bossLevel && run.clean === dungeon.rooms.length) {
       for (const gem of gems) run.xp += gem.value;
       newRun(undefined, true);
     }
-    if (run.xp >= run.need) levelUp();
+    if (!run.bossLevel && run.xp >= run.need) levelUp();
     updateHud();
   }
 

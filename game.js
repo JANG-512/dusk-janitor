@@ -21,7 +21,7 @@
     ring: { label: '정화의 파동', icon: 'M12 3l8 4 3 6-4 7-7 3-8-4-3-7 4-6zm0 5 4 2 2 3-2 4-4 2-4-2-2-4 2-3z', desc: '일정 간격으로 사방에 정화 파동을 퍼뜨립니다.' }
   };
   const utility = [
-    { key: 'haste', label: '손놀림 연습', icon: 'M2 15h6m-3-4h5m-1-4h6m2-4-4 9h7l-8 10 3-9', desc: '빗자루의 재사용 대기시간과 자동 공격 주기가 12% 짧아집니다.', max: 3 },
+    { key: 'haste', label: '손놀림 연습', icon: 'M2 15h6m-3-4h5m-1-4h6m2-4-4 9h7l-8 10 3-9', desc: '주 무기의 재사용 대기시간과 자동 공격 주기가 12% 짧아집니다.', max: 3 },
     { key: 'magnet', label: '수거용 자석', icon: 'M3 4h6v10l3 3 3-3V4h6v10l-3 6-6 2-6-2-3-6zM3 8h6m6 0h6', desc: '멀리 있는 경험치까지 끌어당깁니다.', max: 3 },
     { key: 'heal', label: '따뜻한 차', icon: 'M4 9h12v7l-3 4H7l-3-4zm12 2h4v5h-4M7 6l2-4m3 4 2-4', desc: '최대 체력과 현재 체력이 1씩 증가합니다.', max: 4 }
   ];
@@ -31,24 +31,54 @@
   const gemGlow = makeGlow(12, '#a6e9d0');
   const heroGlow = makeGlow(90, '#edba91');
   const dawnGlow = makeGlow(144, '#e0cd8d');
-  const hints = ['금이 간 오염 통을 빗자루로 치면 주변 통까지 연쇄 폭발합니다.', '길이 갈라지면 어디든 먼저 탐색할 수 있습니다.', '피격 없이 연속 처치하면 겁먹은 몬스터가 청소를 돕습니다.'];
+  const hints = ['금이 간 오염 통을 주 무기로 치면 주변 통까지 연쇄 폭발합니다.', '길이 갈라지면 어디든 먼저 탐색할 수 있습니다.', '피격 없이 연속 처치하면 겁먹은 몬스터가 청소를 돕습니다.'];
   const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
   let dungeon, world, navigation, run, hero, monsters, gems, effects, shots, currentRoom, camera, motes;
   const roles = {
-    sweeper: {name:'솔 · 광장 파수꾼', color:'#69ada0', icon:'broom', start:'세 번째 빗질마다 공명 파동을 냅니다.', paths:[
-      ['울림 증폭','공명 파동 피해 +2'], ['장대 빗자루','모든 빗질과 파동의 사거리 +12']]},
-    alchemist: {name:'루비 · 화약 조제사', color:'#ed9276', icon:'spray', start:'네 번째 빗질이 적중하면 지연 폭발을 일으킵니다.', paths:[
-      ['고농축 약제','기폭제 폭발 피해 +2'], ['확산 배합','기폭제 폭발 반경 +10']]},
-    keeper: {name:'모아 · 정령지기', color:'#ad96ec', icon:'soap', start:'회전 비눗방울을 지니고, 무피격 2연속 처치부터 동료를 모읍니다.', paths:[
-      ['무리 훈련','임시 동료의 공격 피해 +1'], ['수호 궤도','비눗방울 접촉 피해 +1']]}
+    sweeper: {
+      name: "김덕수",
+      weapon: "물걸레",
+      start: "긴 물걸레로 한 줄을 밀고, 6마리마다 미끄러운 바닥을 남긴다.",
+      chapter: "광장의 첫 발자국",
+      story: ["첫차도 안 왔는데 발자국이 열두 개야. 저놈들, 신발도 안 털었구먼.", "덕수가 걸레를 짜자 돌바닥에 가로등이 비쳤다. 뒤쫓던 괴물이 제 발에 미끄러졌다."],
+      paths: [["연장 자루", "찌르기 사거리 +12"], ["광택 왁스", "미끄럼 반경 +5"], ["속성 걸레질", "바닥 생성에 필요한 처치 수 −1"]],
+      color: "#70d3ba",
+      icon: "broom",
+      interval: 0.55,
+      reach: 82,
+    },
+    alchemist: {
+      name: "박철수",
+      weapon: "빗자루",
+      start: "짧게 파고들어 공격 직전의 적을 친다. 카운터 시 18% 확률로 모래바람이 분다.",
+      chapter: "역풍 부는 골목",
+      story: ["바람 부는 날엔 쓸어 봐야 헛수고지. 그래서 난 바람이 돌아설 때까지 기다려.", "철수는 빗자루를 세우고 숨을 골랐다. 괴물이 덤비는 순간, 골목의 모래가 먼저 일어섰다."],
+      paths: [["되치기", "카운터 추가 피해 +1"], ["바람잡이", "모래바람 확률 +4%p"], ["회오리 빗살", "모래바람 탐색 반경 +18"]],
+      color: "#eda064",
+      icon: "broom",
+      interval: 0.49,
+      reach: 32,
+    },
+    keeper: {
+      name: "장억수",
+      weapon: "물 호스",
+      start: "빠른 관통 물줄기로 얼룩을 씻는다. 가끔 호스가 꺾이면 잠시 수리한다.",
+      chapter: "급수탑의 새벽",
+      story: ["압력 좋고, 밸브 좋고… 누가 또 호스 위에 수레를 세웠어?", "억수가 매듭을 풀자 시커먼 벽에 물길이 뚫렸다. 그 뒤로 가게 간판의 푸른 글자가 드러났다."],
+      paths: [["고압 노즐", "물줄기 사거리 +14"], ["보강 피복", "고장 확률 −1%p"], ["현장 공구", "수리 시간 −0.22초"]],
+      color: "#67bfe9",
+      icon: "spray",
+      interval: 0.19,
+      reach: 114,
+    },
   };
   let hardMode = false;
   let hardUnlocked = false;
   try { hardUnlocked = localStorage.getItem('dusk-hard') === '1'; } catch {}
   let role = 'sweeper';
-  const defaults = { auto:false, sound:false, volume:65, shake:true, damage:true, particles:100, map:true, zoom:100, left:false, sensitivity:100, opacity:85 };
+  const defaults = { auto:false, sound:true, music:true, volume:65, shake:true, damage:true, particles:100, map:true, zoom:100, left:false, sensitivity:100, opacity:85 };
   let settings = {...defaults};
   try {
     const saved = JSON.parse(localStorage.getItem('dusk-settings') || '{}');
@@ -72,17 +102,7 @@
 
   function tone(from, to, length, type = 'triangle', delay = 0) {
     if (muted || !settings.volume || audio?.state !== 'running') return;
-    const now = audio.currentTime + delay;
-    const oscillator = audio.createOscillator();
-    const gain = audio.createGain();
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(from, now);
-    oscillator.frequency.exponentialRampToValueAtTime(to, now + length);
-    gain.gain.setValueAtTime(Math.max(.001,.08 * settings.volume / 100), now);
-    gain.gain.exponentialRampToValueAtTime(.001, now + length);
-    oscillator.connect(gain).connect(audio.destination);
-    oscillator.start(now);
-    oscillator.stop(now + length);
+    SweepAudio.effect(from,to,length,type,delay);
   }
 
   function svg(path) {
@@ -142,12 +162,17 @@
         xp: 0, need: 7, level: 1, weapons: { broom: 1 }, bonus: {}, timers: {}, shake: 0,
         charges: [], blastKills: 0, catalyst: 0, echo: 0, extension: 0, swings: 0, shield: false, fieldAt: -1, fieldCooldown: 0, hints: 0
       };
-      run.circuits = [role==='alchemist' ? circuit('broom','mine','heavy') : role==='keeper' ? circuit('gem','lure','wide') : circuit('broom','nova','wide')];
+      run.circuits = [role==='alchemist' ? circuit('special','mine','heavy') : role==='keeper' ? circuit('special','darts','fast') : circuit('special','frost','wide')];
       hero.role = role;
       hero.scarf = roles[role].color;
-      if (role === 'sweeper') run.echo = 1;
-      if (role === 'alchemist') run.catalyst = 1;
-      if (role === 'keeper') run.weapons.soap = 1;
+      run.polishKills = 0;
+      run.repairUntil = 0;
+      weaponData.broom.label = roles[role].weapon;
+      weaponData.broom.icon = {
+        sweeper:'M4 20l12-12m-5-2 3-3 8 8-3 3zM13 5l7 7',
+        alchemist:'M16 9l7-7m-5 8-5-3-5 4-3 9 6-1 6-4 1-5ZM8 16l5 3m-2-7 5 3',
+        keeper:'M2 19h4l2-3v-6l3-3h4m0-2h6v5h-6zM5 20l3 2 3-3v-8l2-1'
+      }[role];
       run.hand = [];
       run.pendingReveals = [];
       run.revealUntil = 0;
@@ -164,6 +189,7 @@
       run.fieldCooldown = 0;
       run.charges = [];
     }
+    run.slicks = [];
     camera = { x: hero.x, y: hero.y };
     monsters = [];
     gems = [];
@@ -309,14 +335,17 @@
     if (uiState.combatTick === tenth) return;
     uiState.combatTick = tenth;
     const remaining = seconds => seconds > 0 ? (Math.ceil(seconds*10)/10).toFixed(1)+'초' : '준비';
-    const tools = ['빗자루 '+remaining(run.timers.broom), '회피 '+remaining(hero.dashCooldown)];
+    const tools = [roles[role].weapon+' '+remaining(run.timers.broom), '회피 '+remaining(hero.dashCooldown)];
     if (run.weapons.spray) tools.push('분무기 '+remaining(run.timers.spray));
     if (run.weapons.ring) tools.push('파동 '+remaining(run.timers.ring));
     const specials = [];
+    if (role === 'sweeper') specials.push('깨끗한 바닥 '+run.polishKills+'/'+(6-talent(2)));
+    if (role === 'alchemist') specials.push('모래바람 '+(18+4*talent(1))+'%');
+    if (run.repairUntil > run.time) specials.push('호스 수리 '+remaining(run.repairUntil-run.time));
     if (run.echo) specials.push('공명 '+(3-run.swings%3)+'회 후');
     if (run.catalyst) specials.push('기폭제 '+(4-run.swings%4)+'회 후');
     if (run.weapons.soap) specials.push('비눗방울 접촉 간격 '+soapInterval+'초/적');
-    const lines = [(settings.auto ? '자동' : '수동')+' · 공속 '+(1/attackInterval(broomInterval)).toFixed(2)+'회/초',tools.join(' · ')];
+    const lines = [(settings.auto ? '자동' : '수동')+' · 공속 '+(1/attackInterval(roles[role].interval)).toFixed(2)+'회/초',tools.join(' · ')];
     if (specials.length) lines.push(specials.join(' · '));
     for (const [i,slot] of run.circuits.entries()) {
       lines.push((i+1)+' '+formulas[slot.formula][0]+' '+remaining(slot.ready-run.time));
@@ -466,6 +495,7 @@
   }
 
   function dialog(next, label, title, detail, buttons) {
+    ui.modal.querySelector('.chapter-art, .crew-banner')?.remove();
     ui.modal.dataset.screen = next;
     mode = next;
     lastFocus = document.activeElement;
@@ -549,18 +579,82 @@
     resize();
   }
   async function unlockAudio() {
-    if (muted) return;
+    if (muted || !window.AudioContext) return;
     audio ??= new AudioContext();
+    SweepAudio.connect(audio);
     await audio.resume();
   }
+  document.addEventListener('pointerdown',unlockAudio,{once:true});
+  document.addEventListener('keydown',unlockAudio,{once:true});
   function titleScreen() {
     const buttons = [];
     if (sessionStarted) buttons.push(action('탐험 이어하기',resume));
     buttons.push(action(sessionStarted ? '새 탐험 준비' : '탐험 준비',()=>{hardMode=false;selectRole();}),action('설정',()=>settingsScreen(titleScreen),true));
     if (hardUnlocked) buttons.push(action('하드모드 탐험',()=>{hardMode=true;selectRole();}));
-    dialog('title','DUSK JANITOR','황혼의 청소부','달안개 마을의 마지막 야간 근무',buttons);
+    dialog('title','OPERATION CLEAN SWEEP','쓱싹 대작전','달안개 마을의 마지막 야간 근무',buttons);
+    const banner=document.createElement('canvas');
+    banner.className='crew-banner';
+    banner.width=260;banner.height=65;
+    const brush=banner.getContext('2d');
+    const sky=brush.createLinearGradient(0,0,0,55);
+    sky.addColorStop(0,'#29283e');sky.addColorStop(1,'#936e73');
+    brush.fillStyle=sky;brush.fillRect(0,0,260,65);
+    brush.fillStyle='#efd1a4';brush.fillRect(195,7,8,8);
+    brush.fillStyle='#393248';brush.fillRect(192,5,8,8);
+    for(let i=0;i<42;i++){
+      brush.fillStyle=i%3?'#c2a8a1':'#ebd7ae';
+      brush.fillRect((i*79)%260,(i*17)%27,1,1);
+    }
+    for(let i=0;i<8;i++){
+      const x=i*38-13,y=30+(i*7)%12;
+      brush.fillStyle='#403648';brush.fillRect(x,y,31,28);
+      brush.fillStyle='#594759';brush.fillRect(x-2,y-2,35,4);
+      brush.fillStyle='#a47c6c';brush.fillRect(x+4,y+5,4,5);
+    }
+    brush.fillStyle='#504955';brush.fillRect(0,51,260,14);
+    let x=101;
+    for(const [id,member] of Object.entries(roles)){
+      drawHero(brush,{x,y:55,role:id,scarf:member.color,facing:{x:1,y:0}},0);
+      x+=27;
+    }
+    ui['dialog-label'].before(banner);
     ui['dialog-actions'].append(DuskLanguage.selector());
   }
+  function showChapter(page) {
+    const data=roles[role];
+    const finish=()=>{resume();announce(data.start,5);};
+    dialog('story',data.chapter,data.name,data.story[page],[
+      action(page ? '출동' : '다음',page ? finish : ()=>showChapter(1)),
+      action('건너뛰기',finish,true)
+    ]);
+    const panel=document.createElement('canvas');
+    panel.width=224;panel.height=58;panel.className='chapter-art';
+    ui['dialog-detail'].before(panel);
+    paintChapter(panel,page);
+  }
+
+  function paintChapter(panel,page) {
+    const brush=panel.getContext('2d');
+    const color=roles[role].color;
+    brush.fillStyle='#241f34';brush.fillRect(0,0,224,58);
+    for(let i=0;i<8;i++){
+      const y=11+(i*13)%17;
+      brush.fillStyle=i%2?'#48374d':'#393749';brush.fillRect(i*31,y,27,45);
+      brush.fillStyle='#cf9d74';brush.fillRect(i*31+6,y+6,3,4);
+    }
+    brush.fillStyle='#5a535e';brush.fillRect(0,46,224,12);
+    const x=page?83:65;
+    drawHero(brush,{x,y:47,role,scarf:color,facing:{x:1,y:0}},0);
+    drawMonster(brush,{x:page?150:178,y:47,type:0,id:2,phase:0},0);
+    if(page){
+      brush.fillStyle=color;
+      for(let i=0;i<16;i++){
+        const y=role==='keeper'?39:role==='sweeper'?49:39+Math.sin(i)*6;
+        brush.fillRect(x+8+i*4,y,role==='alchemist'?2:4,2);
+      }
+    }
+  }
+
   function selectRole() {
     const cards = Object.entries(roles).map(([key,data])=>{
       const button = action('',()=>{
@@ -568,7 +662,7 @@
         sessionStarted = true;
         unlockAudio();
         newRun();
-        announce(data.name + ' · 장비 칸을 누르면 조합을 설계합니다',5);
+        showChapter(0);
       });
       button.className = 'role-card';
       const portrait = document.createElement('canvas');
@@ -587,7 +681,7 @@
   function settingsScreen(back) {
     const groups = [
       ['공격 방식',[['auto','기본 공격 자동 조준·연사']]],
-      ['소리',[['sound','효과음'],['volume','효과음 음량',0,100]]],
+      ['소리',[['sound','게임 소리'],['music','배경 음악'],['volume','전체 음량',0,100]]],
       ['화면과 효과',[['zoom','화면 배율',75,130],['map','미니맵'],['shake','화면 흔들림'],['particles','입자 효과 밀도',0,100],['damage','피해 숫자']]],
       ['터치 조작',[['left','오른손 이동 스틱'],['sensitivity','스틱 감도',60,160],['opacity','조작 버튼 불투명도',35,100]]]
     ];
@@ -640,7 +734,7 @@
   });
   function showPauseMenu() {
     const buttons = [action('계속하기', resume), action('내 빌드',()=>buildBook(showPauseMenu),true), action('설정',()=>settingsScreen(showPauseMenu),true), action('타이틀로',titleScreen,true)];
-    let detail = '빗자루를 내려놓고 잠시 쉬어 갑니다.';
+    let detail = '도구를 내려놓고 잠시 쉬어 갑니다.';
     if (!installed() && installPrompt) {
       buttons.push(action('홈 화면에 설치', async () => {
         const prompt = installPrompt;
@@ -662,8 +756,9 @@
     }
   }
 
+  const signatureEvents = {sweeper:'적 미끄러짐', alchemist:'카운터 적중', keeper:'물줄기 세 번째 분사'};
   const triggers = {
-    broom:'수동 빗질 적중', dash:'회피 시작', gem:'경험치 수거', kill:'몬스터 처치',
+    broom:'주 무기 적중', dash:'회피 시작', gem:'경험치 수거', kill:'몬스터 처치',
     blast:'아군 폭발', ally:'동료 공격 적중', spray:'분무기 적중'
   };
   const formulas = {
@@ -762,7 +857,7 @@
         const prerequisite = {spray:'분무기 탄환이 필요합니다. ', ally:'임시 동료가 필요합니다. ', blast:'오염 통, 기폭제 또는 앞 슬롯의 정화탄 폭발로 발동합니다. '}[slot.trigger] ?? '';
         DuskLanguage.bind(preview, 'text', prerequisite + formulas[slot.formula][1]+' 피해 '+stats.power+' · 반경 '+stats.radius+' · 재사용 '+stats.delay.toFixed(1)+'초 · 발동 '+slot.count+'회');
       };
-      for(const [key,label,items] of [['trigger','조건',triggers],['formula','효과',formulas],['style','개조',styles]]) {
+      for(const [key,label,items] of [['trigger','조건',{...triggers,special:signatureEvents[role]}],['formula','효과',formulas],['style','개조',styles]]) {
         const row=document.createElement('label');
         DuskLanguage.bind(row, 'text', label);
         const select=document.createElement('select');
@@ -805,7 +900,7 @@
     })).filter(item=>(run.bonus[item.key] ?? 0)<4);
     const options = specialty.length ? [specialty[Math.floor(Math.random()*specialty.length)]] : [];
     // On milestone levels, offer both branches so the player can deliberately specialize.
-    if (run.level % 3 === 0 && specialty.length === 2) options.push(specialty.find(item=>item!==options[0]));
+    if (run.level % 3 === 0 && specialty.length >= 2) options.push(specialty.find(item=>item!==options[0]));
     if (unowned.length) options.push(unowned[Math.floor(Math.random() * unowned.length)]);
     const upgrades=modules.filter(item=>(run.bonus[item.key]??0)<item.max);
     if(upgrades.length) options.push(upgrades[Math.floor(Math.random()*upgrades.length)]);
@@ -828,9 +923,6 @@
       button.innerHTML = svg(option.icon) + '<b>' + DuskLanguage.translate(option.label) + ' Lv.' + next + '</b><small>' + DuskLanguage.translate(option.desc) + '</small>';
       button.onclick = () => {
         holder[option.key] = next;
-        if (option.key === 'sweeper0') run.echo += 2;
-        if (option.key === 'sweeper1') run.extension += 12;
-        if (option.key === 'alchemist0') run.catalyst += 2;
         if (option.key === 'heal') {
           hero.max++;
           hero.hp++;
@@ -866,7 +958,7 @@
   }
 
   function showFear(origin) {
-    if (run.streak < (role === 'keeper' ? 2 : 4) || run.allies >= 2) return;
+    if (run.streak < 4 || run.allies >= 2) return;
     if (monsters.filter(m => m.hp > 0 && m.fear > 0).length + run.allies >= 2) return;
     const candidates = hostiles().filter(m => !m.warden && m.room === origin.room && distance(origin, m) < 115);
     if (candidates.length < 2) return;
@@ -960,7 +1052,7 @@
 
   function damageMonster(m, amount, origin, player = true, sourceSlot = -1, source = '빗질') {
     if (m.hp <= 0 || m.friendly || m.fear > 0) return;
-    if (m.shell && source!=='새벽의 종') {
+    if (m.shell && source!=='새벽의 종' && source!=='모래바람') {
       m.shell=false;
       m.specialTimer=5;
       burst(m.x,m.y-8,'#bde1eb',12,54);
@@ -989,6 +1081,11 @@
       showFear(m);
     }
     run.kills++;
+    if (role === 'sweeper' && ++run.polishKills >= 6-talent(2)) {
+      run.polishKills = 0;
+      run.slicks.push({x:m.x, y:m.y, radius:24+5*talent(1), until:run.time+13});
+      burst(m.x,m.y,'#acf5e1',15,40);
+    }
     if (++run.cardKills >= cardInterval()) {
       run.cardKills = 0;
       const id=Math.floor(Math.random()*deck.length);
@@ -1003,7 +1100,8 @@
         tone(230,100,.22);
       } else {
         run.hand.push(id);
-
+        tone(554,740,.09,'square');
+        tone(831,1109,.15,'triangle',.08);
       }
     }
     if (m.bossLevel) {
@@ -1055,7 +1153,11 @@
     ]);
   }
 
-  const broomInterval = .61;
+  const talent = index => run.bonus[role+index] || 0;
+  function weaponReach() {
+    const bonus = role === 'keeper' ? 14 : role === 'sweeper' ? 12 : 0;
+    return roles[role].reach + bonus * talent(0) + 3 * run.weapons.broom + run.extension;
+  }
   const soapInterval = .55;
   function attackInterval(base) {
     return base * .88 ** (run.bonus.haste ?? 0);
@@ -1079,10 +1181,32 @@
   function swingBroom(aim = hero.facing) {
     if (mode !== 'playing' || (run.timers.broom ?? 0) > 0) return;
     const broom = run.weapons.broom;
-    const reach = 59 + 6 * broom + run.extension;
+    if (run.repairUntil > run.time) return;
+    const hose = role === 'keeper';
+    if (hose && run.swings > 0 && !run.justRepaired && Math.random() < .06-.01*talent(1)) {
+      run.repairUntil = run.time + 1.45-.22*talent(2);
+      run.timers.broom = run.repairUntil-run.time;
+      run.justRepaired = true;
+      announce('호스 수리',run.timers.broom);
+      tone(150,57,.14,'square');
+      return;
+    }
+    run.justRepaired = false;
+    let reach = weaponReach();
+    for (let step=3;step<=reach;step+=3) {
+      if (!feetFree(hero.x+aim.x*step,hero.y+aim.y*step,0)) {reach=step-3;break;}
+    }
+    const halfWidth = role === 'alchemist' ? 11 : hose ? 5 : 7;
+    const hit = point => {
+      const dx=point.x-hero.x, dy=point.y-hero.y;
+      const forward=dx*aim.x+dy*aim.y;
+      return forward>=-2 && forward<=reach && Math.abs(dx*aim.y-dy*aim.x)<=halfWidth && clearLine(hero,point);
+    };
     hero.facing = aim;
-    sweep(hero, aim, '#ffe9a9', reach);
-    cooldown('broom', broomInterval);
+    const end = {x:hero.x+aim.x*reach,y:hero.y+aim.y*reach};
+    effects.push({kind:'tool',role,x:hero.x,y:hero.y-5,angle:Math.atan2(aim.y,aim.x),radius:reach,life:.19,full:.19});
+    if (hose) washStripe(hero,end);
+    cooldown('broom',roles[role].interval);
     run.swings++;
     if (run.echo && run.swings % 3 === 0) {
       effects.push({kind:'ring', x:hero.x, y:hero.y-4, radius:reach, life:.38, full:.38, color:'#9cebc2'});
@@ -1092,25 +1216,56 @@
     }
     for (const room of dungeon.rooms) {
       for (const keg of room.casks) {
-        if (keg.used || distance(hero,keg) > reach || !clearLine(hero,keg)) continue;
-        const dir = toward(hero,keg);
-        if (dir.x*aim.x + dir.y*aim.y > 0) ignite(keg);
+        if (!keg.used && hit(keg)) ignite(keg);
       }
     }
     let primed = run.catalyst > 0 && run.swings % 4 === 0;
-    tone(304, 154, .08);
+    if (hose) tone(610,310,.075,'triangle');
+    else if (role==='sweeper') tone(340,130,.13);
+    else tone(235,94,.08,'square');
     for (const m of hostiles()) {
-      const r = distance(hero, m);
-      if (r > reach || !clearLine(hero, m)) continue;
-      const dir = toward(hero, m);
-      if (r <= 18 || dir.x * aim.x + dir.y * aim.y > -.02) {
-        if (primed) {
-          arm(m,42 + 10*(run.bonus.alchemist1 ?? 0),.35,2 + run.catalyst);
-          primed = false;
-        }
-        damageMonster(m, broom, hero);
-        circuitEvent('broom',m);
+      if (!hit(m) || m.hp<=0 || m.fear>0) continue;
+      const counter = role==='alchemist' && (m.windup>0 || m.rush>0);
+      if (primed) {
+        arm(m,42,.35,2+run.catalyst);
+        primed=false;
       }
+      damageMonster(m,broom+(counter ? 1+talent(0) : 0),hero,true,-1,counter?'카운터':roles[role].weapon);
+      if (counter) {
+        if (Math.random()<.18+.04*talent(1)) sandstorm(m);
+        circuitEvent('special',m);
+      }
+      circuitEvent('broom',m);
+    }
+    if (hose && run.swings%3===0) circuitEvent('special',end);
+  }
+
+  function washStripe(start,end) {
+    for (const room of dungeon.rooms) for (const core of room.cores) {
+      if (Math.abs(core.x-start.x)>weaponReach()+69 || Math.abs(core.y-start.y)>weaponReach()+44) continue;
+      const brush=core.sprite.getContext('2d');
+      brush.save();
+      brush.scale(core.sprite.width/138,core.sprite.height/88);
+      brush.translate(69-core.x,44-core.y);
+      brush.globalCompositeOperation='destination-out';
+      brush.lineWidth=10;
+      brush.lineCap='round';
+      brush.beginPath();brush.moveTo(start.x,start.y);brush.lineTo(end.x,end.y);brush.stroke();
+      brush.restore();
+    }
+  }
+
+  function sandstorm(center) {
+    const radius=90+18*talent(2);
+    const victims=hostiles().filter(m=>!m.bossLevel && !m.warden && distance(center,m)<=radius && clearLine(center,m))
+      .sort((a,b)=>distance(center,a)-distance(center,b)).slice(0,Math.random()<.5?2:3);
+    effects.push({kind:'gust',x:center.x,y:center.y,radius:32,life:.6,full:.6});
+    tone(340,65,.28,'sawtooth');
+    for (const m of victims) {
+      if (m.hp<=0 || m.friendly) continue;
+      m.fear=0;
+      effects.push({kind:'gust',x:m.x,y:m.y,radius:17,life:.48,full:.48});
+      damageMonster(m,m.hp,center,true,-1,'모래바람');
     }
   }
 
@@ -1119,7 +1274,7 @@
     if (run.timers.broom <= 0) {
       if (heldAttack) swingHeld();
       else if (settings.auto) {
-        const reach = 59 + 6 * run.weapons.broom + run.extension;
+        const reach = weaponReach();
         const target = nearest(hero,hostiles().filter(m=>clearLine(hero,m)),reach);
         if (target) swingBroom(toward(hero,target));
       }
@@ -1155,7 +1310,7 @@
       if (!tileFree(bubble.x, bubble.y)) continue;
       for (const m of visible) {
         if (m.soapHit <= 0 && distance(bubble, m) <= 11) {
-          damageMonster(m, soap + (run.bonus.keeper1 ?? 0), bubble,true,-1,'비눗방울');
+          damageMonster(m, soap, bubble,true,-1,'비눗방울');
           m.soapHit = soapInterval;
         }
       }
@@ -1192,9 +1347,22 @@
       if (target && m.cooldown <= 0 && distance(m, target) < 29) {
         m.cooldown = .84;
         sweep(m, toward(m, target), '#a8ebc3', 26);
-        damageMonster(target, 1 + (run.bonus.keeper0 ?? 0), m, false,-1,'동료');
+        damageMonster(target, 1, m, false,-1,'동료');
         circuitEvent('ally',target);
       }
+      return;
+    }
+    if (m.slipUntil > run.time) {
+      move(m,m.slide.x*dt*108,m.slide.y*dt*108,3);
+      return;
+    }
+    if (!m.bossLevel && !(m.slipReady > run.time) && run.slicks.some(s => distance(m,s)<s.radius)) {
+      m.slide = toward(m,hero);
+      m.slipUntil = run.time+.52;
+      m.slipReady = run.time+1.4;
+      m.rush=m.windup=0;
+      burst(m.x,m.y,'#b3fff0',5,22);
+      circuitEvent('special',m);
       return;
     }
     if (m.grace > 0) {
@@ -1379,6 +1547,7 @@
 
   function update(dt) {
     run.time += dt;
+    run.slicks = run.slicks.filter(s=>s.until>run.time);
     updateReveal();
     run.shake = Math.max(0, run.shake - dt);
     if (run.time >= noticeUntil && ui.message.textContent) DuskLanguage.bind(ui.message, 'text', '');
@@ -1474,7 +1643,30 @@
     for (const fx of effects) {
       const fade = Math.min(1, fx.life * 5);
       ctx.globalAlpha = fade;
-      if (fx.kind === 'bolt') {
+      if (fx.kind === 'tool' || fx.kind === 'gust') {
+        const t=1-fx.life/fx.full;
+        ctx.save();
+        ctx.translate(fx.x,fx.y);
+        if (fx.kind==='gust') {
+          for(let i=0;i<42;i++){
+            const a=i*.85+t*9, radius=fx.radius*(i%13)/13;
+            box(Math.cos(a)*radius,Math.sin(a)*radius*.4-(i%13)-t*9,3,2,i%2?'#f4cf85':'#bc905e');
+          }
+        } else {
+          ctx.rotate(fx.angle);
+          const length=fx.radius*(.6+.4*Math.sin(t*Math.PI));
+          if (fx.role==='keeper') {
+            box(0,-2,fx.radius,4,'#67bedf');box(3,-1,Math.max(0,fx.radius-3),1,'#e2fff9');
+            for(let i=3;i<fx.radius;i+=7)box(i,Math.sin(t*10+i)*3,2,2,'#a1e8ff');
+          } else {
+            if(fx.role==='alchemist')ctx.rotate((t-.5)*.57);
+            box(0,-1,length,2,'#c49972');
+            box(length-5,-4,5,8,fx.role==='sweeper'?'#7ac6c3':'#e2bb76');
+            for(let i=-3;i<=3;i+=2)box(length,i,4,1,'#f0ead1');
+          }
+        }
+        ctx.restore();
+      } else if (fx.kind === 'bolt') {
         ctx.strokeStyle=fx.color;
         ctx.lineWidth=2;
         ctx.beginPath();ctx.moveTo(fx.x,fx.y);
@@ -1511,7 +1703,7 @@
         ctx.save();
         ctx.translate(Math.round(fx.x), Math.round(fx.y));
         if(run.mirrorUntil>run.time) ctx.scale(-1,1);
-        ctx.strokeText(fx.text,0,0);
+        ctx.strokeText(DuskLanguage.translate(fx.text),0,0);
         ctx.fillStyle = fx.color;
         ctx.fillText(DuskLanguage.translate(fx.text),0,0);
         ctx.restore();
@@ -1585,6 +1777,13 @@
       }
       for (const [x, y] of room.lamps) {
         if (inView(x, y, 54)) glow(warmGlow, x, y, .58 + .07 * Math.sin(run.time * 4 + x));
+      }
+    }
+    for (const slick of run.slicks) {
+      ctx.fillStyle='#78d9c34d';ctx.beginPath();ctx.arc(slick.x,slick.y,slick.radius,0,Math.PI*2);ctx.fill();
+      for(let i=0;i<7;i++){
+        const a=i*2.4+run.time*.22;
+        box(slick.x+Math.cos(a)*slick.radius*.7,slick.y+Math.sin(a)*slick.radius*.7,5,1,'#b4f0da');
       }
     }
     for (const c of run.charges) {
@@ -1705,6 +1904,8 @@
     navigator.serviceWorker.register('./sw.js').catch(error => console.warn('오프라인 준비 실패', error));
   }
   document.addEventListener('visibilitychange', () => {
+    if (audio && document.hidden) audio.suspend();
+    else if (audio && !muted) unlockAudio();
     if (document.hidden && mode === 'playing') togglePause();
   });
 
@@ -1795,6 +1996,10 @@
   });
 
   ui.game.tabIndex = -1;
+  ui['combat-toggle'].onclick=()=>{
+    const open=ui.game.classList.toggle('combat-expanded');
+    ui['combat-toggle'].setAttribute('aria-expanded',String(open));
+  };
   ui.cards.addEventListener('click',openHand);
   ui.loadout.addEventListener('click',()=>{ if(mode==='playing') buildBook(); });
   ui.interact.addEventListener('click', useStation);
@@ -1831,6 +2036,7 @@
     const dt = Math.min(.033, Math.max(0, (now - lastFrame) / 1000));
     lastFrame = now;
     if (mode === 'playing' && dt > 0) update(dt);
+    SweepAudio.tick(settings,mode,run.bossLevel,dungeon.regionIndex);
     draw();
     requestAnimationFrame(loop);
   }

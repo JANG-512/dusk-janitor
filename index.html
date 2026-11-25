@@ -9,19 +9,20 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>황혼의 청소부 · Dusk Janitor</title>
+  <title>쓱싹 대작전</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cpath fill='%23332735' d='M0 0h26v26H0z'/%3E%3Cpath fill='none' stroke='%23f3cd8a' stroke-width='1.5' d='m14 11 7-8m-5 9-5-3-5 4-2 8 6-1 5-3 1-5ZM7 16l4 3m-2-6 4 3'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="fonts/galmuri.css">
-  <link rel="stylesheet" href="style.css?v=14">
-  <script defer src="dungeon.js?v=14"></script>
-  <script defer src="art.js?v=14"></script>
-  <script defer src="scene.js?v=14"></script>
-  <script defer src="language.js?v=14"></script>
-  <script defer src="game.js?v=14"></script>
+  <link rel="stylesheet" href="style.css?v=15">
+  <script defer src="dungeon.js?v=15"></script>
+  <script defer src="art.js?v=15"></script>
+  <script defer src="scene.js?v=15"></script>
+  <script defer src="language.js?v=15"></script>
+  <script defer src="music.js?v=15"></script>
+  <script defer src="game.js?v=15"></script>
 </head>
 <body>
   <main id="game">
-    <canvas id="world" aria-label="황혼의 청소부 던전. 방향키 또는 WASD로 이동하고, 스페이스바나 마우스 클릭으로 빗자루를 휘두르세요. Shift로 회피합니다."></canvas>
+    <canvas id="world" aria-label="쓱싹 대작전 던전. 방향키 또는 WASD로 이동하고, 스페이스바나 마우스 클릭으로 주 무기로 공격하세요. Shift로 회피합니다."></canvas>
     <i id="camera-center" aria-hidden="true"></i>
     <div class="vignette" aria-hidden="true"></div>
 
@@ -34,7 +35,7 @@
         <div class="game-mark" aria-hidden="true">
           <svg viewBox="0 0 26 26" fill="none"><path d="m14 11 7-8m-5 9-5-3-5 4-2 8 6-1 5-3 1-5ZM7 16l4 3m-2-6 4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/></svg>
         </div>
-        <div class="identity-label"><h1>황혼의 청소부</h1><span id="region">달안개 마을</span></div>
+        <div class="identity-label"><h1>쓱싹 대작전</h1><span id="region">달안개 마을</span></div>
         <div class="health" id="health" role="img"></div>
       </header>
 
@@ -66,13 +67,13 @@
         <div class="stat"><span class="mini-icon hostile" aria-hidden="true">◆</span><span>처치</span><b id="kills">0</b></div>
         <div class="stat"><span class="mini-icon friendly" aria-hidden="true">✦</span><span>동료</span><b id="party">0</b></div>
       </div>
-      <div class="contract"><div id="contract"></div><button id="cards" type="button" title="카드 손패 (C)">카드 0</button><div id="combat" aria-label="전투 상태"></div></div>
+      <div class="contract"><div id="contract"></div><button id="cards" type="button" title="카드 손패 (C)">카드 0</button><button type="button" id="combat-toggle" aria-expanded="false" aria-controls="combat">전투 정보</button><div id="combat" aria-label="전투 상태"></div></div>
       <div class="encounter" id="encounter"></div>
 
       <button type="button" id="interact" hidden></button>
       <div id="message" class="message" aria-live="polite"></div>
 
-      <div id="hint" class="hint"><span><kbd>W A S D</kbd> 이동</span><span><kbd>SHIFT</kbd> 회피</span><span><kbd>SPACE / 클릭</kbd> 빗자루 공격</span></div>
+      <div id="hint" class="hint"><span><kbd>W A S D</kbd> 이동</span><span><kbd>SHIFT</kbd> 회피</span><span><kbd>SPACE / 클릭</kbd> 주 무기 공격</span></div>
       <button type="button" class="loadout" id="loadout" aria-label="내 빌드 · 조합 작업실" title="조합 작업실 (B)"></button>
 
       <div class="experience">

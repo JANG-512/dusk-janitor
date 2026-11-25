@@ -262,9 +262,6 @@ const DuskArt = (() => {
     rect(ctx, x - 6, y - 16, 12, 2, '#3a334b');
     rect(ctx, x - 4, y - 19, 8, 4, '#d5b580');
     rect(ctx, x - 3, y - 19, 6, 1, '#f2d8a3');
-    rect(ctx, x + side * 6 - 1, y - 12, 2, 11, '#885f54');
-    rect(ctx, x + side * 6 - 2, y - 4, 4, 5, '#dfb575');
-    rect(ctx, x + side * 6 - 2, y - 2, 4, 2, '#a87858');
     // A tied scarf, tool belt and stitched satchel follow the cleaner's stride.
     rect(ctx,x-4,y-11,8,2,hero.scarf || '#69ada0');
     rect(ctx,x-side*6,y-11+step,3,4,'#48877e');
@@ -284,7 +281,18 @@ const DuskArt = (() => {
       rect(ctx,x-7,y-21,2,3,'#d3afdb');
       rect(ctx,x+5,y-7,3,4,'#a9e5b3');
     }
-    for (let n=0;n<3;n++) rect(ctx,x+side*6-2+n*2,y-1,1,3,'#f1ca83');
+    const grip=x+side*7;
+    if(hero.role==='keeper'){
+      rect(ctx,x-side*7-2,y-12,5,10,'#447b91');
+      rect(ctx,grip-2,y-9,5,3,'#8dbecc');
+      rect(ctx,grip+side*3,y-10,3,4,'#eee2bb');
+      rect(ctx,grip-1,y-7,2,7,'#598a77');
+    }else{
+      rect(ctx,grip-1,y-15,2,15,'#ac8a6e');
+      const mop=hero.role==='sweeper';
+      rect(ctx,grip-3,y-3,6,4,mop?'#99c7bf':'#d2a164');
+      for(let n=0;n<3;n++)rect(ctx,grip-3+n*2,y,1,3+n%2,mop?'#d6e6d2':'#f1ca83');
+    }
     ctx.restore();
   }
 

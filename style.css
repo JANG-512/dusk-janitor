@@ -241,3 +241,33 @@ input, select, option {font-family:inherit;}
   border: 1px solid #806c88;
   padding: .35em .6em;
 }
+
+#combat-toggle {display:none;}
+.chapter-art {display:block;width:100%;height:auto;max-height:24vh;object-fit:contain;image-rendering:pixelated;margin:12px auto;}
+.modal[data-screen="story"] .dialog {max-width:540px;}
+.modal[data-screen="story"] #dialog-detail {min-height:3em;line-height:1.65;word-break:keep-all;}
+#game:has(.modal[data-screen="story"]:not([hidden])) .hud {visibility:hidden;}
+@media (min-width:880px) and (pointer:fine) {
+  .contract {padding:10px 12px;border-left:2px solid #b69a7d;background:#1e1928dc;font-size:12px;}
+  #combat {background:none;font-size:12px;line-height:1.58;}
+  .modal[data-screen="roles"] .dialog {width:min(830px,90vw);}
+  .role-card {padding:18px 14px;gap:10px;}
+  .role-card canvas {width:108px;height:96px;}
+  #card-reveal {width:308px;left:auto;right:var(--x);top:calc(var(--y) + 210px);translate:none;}
+}
+@media (pointer:coarse) {
+  #combat-toggle {display:inline-block;margin-left:4px;font-size:11px;padding:4px 7px;color:#d6ece3;background:#263239;border:1px solid #60787b;pointer-events:auto;}
+  #game:not(.combat-expanded) #combat {display:none;}
+  #combat {background:#191722ed;}
+  #cards,#combat-toggle {min-height:28px;}
+}
+@media(prefers-reduced-motion:no-preference) {
+  .chapter-art {animation:chapter-enter .55s steps(8,end) both;}
+  .modal[data-screen="roles"] .role-card canvas {animation:crew-idle 1.5s steps(2,end) infinite alternate;}
+  .role-card:nth-child(2) canvas {animation-delay:-.5s;}
+  @keyframes chapter-enter {from{clip-path:inset(0 96% 0 0);}to{clip-path:inset(0);}}
+  @keyframes crew-idle {to{transform:translateY(-3px);}}
+}
+.crew-banner {display:block;width:min(100%,520px);height:auto;max-height:18vh;object-fit:contain;margin:0 auto 14px;image-rendering:pixelated;}
+.modal[data-screen="title"] .dialog {padding-block:clamp(14px,4vh,38px);}
+@media(max-height:480px){.crew-banner{max-height:15vh;margin-bottom:6px;}.modal[data-screen="title"] .dialog{padding-block:9px;}}

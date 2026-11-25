@@ -1,6 +1,210 @@
 const DuskLanguage = (() => {
   const names = {ko: '한국어', ja: '日本語', en: 'English'};
   const messages = {
+    "적 미끄러짐":["Enemy slips","敵が滑った時"],
+    "카운터 적중":["Counter hit","カウンター命中"],
+    "물줄기 세 번째 분사":["Every third jet","3回目の放水"],
+  "김덕수": [
+    "Kim Deok-su",
+    "キム・ドクス"
+  ],
+  "물걸레": [
+    "Wet Mop",
+    "水モップ"
+  ],
+  "긴 물걸레로 한 줄을 밀고, 6마리마다 미끄러운 바닥을 남긴다.": [
+    "Push a long, narrow mop. Every six kills leave a slick floor.",
+    "長いモップで直線を突く。6体倒すたびに滑る床を残す。"
+  ],
+  "광장의 첫 발자국": [
+    "Footprints in the plaza",
+    "広場の足跡"
+  ],
+  "첫차도 안 왔는데 발자국이 열두 개야. 저놈들, 신발도 안 털었구먼.": [
+    "Twelve muddy footprints before the first bus? They never even wiped their feet.",
+    "始発前なのに泥の足跡が十二個。靴ぐらい拭いてくれよ。"
+  ],
+  "덕수가 걸레를 짜자 돌바닥에 가로등이 비쳤다. 뒤쫓던 괴물이 제 발에 미끄러졌다.": [
+    "Deok-su wrings his mop. A lamp glints on the cobbles. The creature on his heels slides right past.",
+    "ドクスがモップを絞ると石畳に街灯が映った。追ってきた魔物が滑って通り過ぎた。"
+  ],
+  "연장 자루": [
+    "Telescopic shaft",
+    "伸縮柄"
+  ],
+  "찌르기 사거리 +12": [
+    "Thrust reach +12",
+    "突きの射程 +12"
+  ],
+  "광택 왁스": [
+    "Floor wax",
+    "床ワックス"
+  ],
+  "미끄럼 반경 +5": [
+    "Slick radius +5",
+    "滑る床の半径 +5"
+  ],
+  "속성 걸레질": [
+    "Quick polish",
+    "早磨き"
+  ],
+  "바닥 생성에 필요한 처치 수 −1": [
+    "One fewer kill per slick",
+    "床生成に必要な撃破数 −1"
+  ],
+  "박철수": [
+    "Park Cheol-su",
+    "パク・チョルス"
+  ],
+  "빗자루": [
+    "Broom",
+    "ほうき"
+  ],
+  "짧게 파고들어 공격 직전의 적을 친다. 카운터 시 18% 확률로 모래바람이 분다.": [
+    "Strike at close range during an enemy attack. Counters have an 18% chance to summon a sandstorm.",
+    "間合いを詰めて敵の攻撃に合わせる。カウンター時18%で砂嵐が起こる。"
+  ],
+  "역풍 부는 골목": [
+    "Wind against the grain",
+    "向かい風の路地"
+  ],
+  "바람 부는 날엔 쓸어 봐야 헛수고지. 그래서 난 바람이 돌아설 때까지 기다려.": [
+    "No point sweeping into the wind. I wait for it to turn.",
+    "風に逆らって掃いても無駄さ。風向きが変わるのを待つんだ。"
+  ],
+  "철수는 빗자루를 세우고 숨을 골랐다. 괴물이 덤비는 순간, 골목의 모래가 먼저 일어섰다.": [
+    "Cheol-su plants his broom and waits. As the creature lunges, the sand in the alley rises first.",
+    "チョルスはほうきを立てて待った。魔物が飛びかかった瞬間、路地の砂が舞い上がった。"
+  ],
+  "되치기": [
+    "Riposte",
+    "切り返し"
+  ],
+  "카운터 추가 피해 +1": [
+    "Counter bonus damage +1",
+    "カウンター追加ダメージ +1"
+  ],
+  "바람잡이": [
+    "Wind catcher",
+    "風読み"
+  ],
+  "모래바람 확률 +4%p": [
+    "Sandstorm chance +4 percentage points",
+    "砂嵐の確率 +4ポイント"
+  ],
+  "회오리 빗살": [
+    "Vortex bristles",
+    "旋風の穂先"
+  ],
+  "모래바람 탐색 반경 +18": [
+    "Sandstorm search radius +18",
+    "砂嵐の索敵半径 +18"
+  ],
+  "장억수": [
+    "Jang Eok-su",
+    "チャン・オクス"
+  ],
+  "물 호스": [
+    "Water hose",
+    "ホース"
+  ],
+  "빠른 관통 물줄기로 얼룩을 씻는다. 가끔 호스가 꺾이면 잠시 수리한다.": [
+    "Rapid piercing jets wash stains away. A kink occasionally interrupts the stream for repairs.",
+    "貫通する水流で汚れを洗う。時々ホースが折れ曲がり修理が必要になる。"
+  ],
+  "급수탑의 새벽": [
+    "Daybreak at the water tower",
+    "給水塔の夜明け"
+  ],
+  "압력 좋고, 밸브 좋고… 누가 또 호스 위에 수레를 세웠어?": [
+    "Pressure good. Valve good. Who parked a cart on my hose again?",
+    "水圧よし、バルブよし……またホースの上に荷車を置いたのは誰だ？"
+  ],
+  "억수가 매듭을 풀자 시커먼 벽에 물길이 뚫렸다. 그 뒤로 가게 간판의 푸른 글자가 드러났다.": [
+    "Eok-su frees the kink. Water cuts a stripe through the grime, revealing blue letters on an old shop sign.",
+    "オクスがねじれを直すと黒い壁に水の筋が走り、古い看板の青い文字が現れた。"
+  ],
+  "고압 노즐": [
+    "Pressure nozzle",
+    "高圧ノズル"
+  ],
+  "물줄기 사거리 +14": [
+    "Jet reach +14",
+    "水流の射程 +14"
+  ],
+  "보강 피복": [
+    "Braided sleeve",
+    "補強被覆"
+  ],
+  "고장 확률 −1%p": [
+    "Jam chance −1 percentage point",
+    "故障率 −1ポイント"
+  ],
+  "현장 공구": [
+    "Field toolkit",
+    "携帯工具"
+  ],
+  "수리 시간 −0.22초": [
+    "Repair time −0.22s",
+    "修理時間 −0.22秒"
+  ],
+  "쓱싹 대작전": [
+    "Operation Clean Sweep",
+    "おそうじ大作戦"
+  ],
+  "다음": [
+    "Next",
+    "次へ"
+  ],
+  "건너뛰기": [
+    "Skip",
+    "スキップ"
+  ],
+  "출동": [
+    "Head out",
+    "出動"
+  ],
+  "깨끗한 바닥": [
+    "Polished floor",
+    "磨いた床"
+  ],
+  "모래바람": [
+    "Sandstorm",
+    "砂嵐"
+  ],
+  "카운터": [
+    "Counter",
+    "カウンター"
+  ],
+  "호스 수리": [
+    "Hose repair",
+    "ホース修理"
+  ],
+  "게임 소리": [
+    "Game audio",
+    "ゲーム音声"
+  ],
+  "전체 음량": [
+    "Master volume",
+    "全体音量"
+  ],
+  "배경 음악": [
+    "Music",
+    "背景音楽"
+  ],
+  "전투 정보": [
+    "Combat details",
+    "戦闘情報"
+  ],
+  "주 무기 공격": [
+    "Primary attack",
+    "主武器攻撃"
+  ],
+  "주 무기 적중": [
+    "Primary hit",
+    "主武器命中"
+  ]
+,
     "달빛 빗자루": ["Moonlight Broom", "月光のほうき"],
     "공격 범위와 피해가 증가합니다.": ["Increases sweep range and damage.", "攻撃範囲とダメージが上がる。"],
     "회전 비눗방울": ["Orbiting Bubbles", "回転シャボン玉"],
@@ -10,12 +214,12 @@ const DuskLanguage = (() => {
     "정화의 파동": ["Cleansing Wave", "浄化の波動"],
     "일정 간격으로 사방에 정화 파동을 퍼뜨립니다.": ["Sends out a cleansing wave at regular intervals.", "一定間隔で周囲に浄化の波動を放つ。"],
     "손놀림 연습": ["Quick Hands", "手さばきの稽古"],
-    "빗자루의 재사용 대기시간과 자동 공격 주기가 12% 짧아집니다.": ["Reduces broom cooldown and automatic attack intervals by 12%.", "ほうきの再使用時間と自動攻撃の間隔が12%短くなる。"],
+    "주 무기의 재사용 대기시간과 자동 공격 주기가 12% 짧아집니다.": ["Reduces primary cooldown and automatic attack intervals by 12%.", "主武器の再使用時間と自動攻撃の間隔が12%短くなる。"],
     "수거용 자석": ["Pickup Magnet", "回収用磁石"],
     "멀리 있는 경험치까지 끌어당깁니다.": ["Pulls in XP crystals from farther away.", "遠くの経験値結晶も引き寄せる。"],
     "따뜻한 차": ["Warm Tea", "温かいお茶"],
     "최대 체력과 현재 체력이 1씩 증가합니다.": ["Raises current and maximum HP by 1.", "現在HPと最大HPが1増える。"],
-    "금이 간 오염 통을 빗자루로 치면 주변 통까지 연쇄 폭발합니다.": ["Hit a cracked barrel with your broom to set off a chain of explosions.", "ひび割れた汚染樽をほうきで叩くと、周りの樽も連鎖爆発する。"],
+    "금이 간 오염 통을 주 무기로 치면 주변 통까지 연쇄 폭발합니다.": ["Hit a cracked barrel with your primary weapon to set off a chain of explosions.", "ひび割れた汚染樽を主武器で叩くと、周りの樽も連鎖爆発する。"],
     "길이 갈라지면 어디든 먼저 탐색할 수 있습니다.": ["At a fork, you can explore either path first.", "分かれ道では好きな道から探索できる。"],
     "피격 없이 연속 처치하면 겁먹은 몬스터가 청소를 돕습니다.": ["Defeat enemies without taking damage and frightened monsters will help you clean.", "無傷で敵を連続撃破すると、おびえた魔物が掃除を手伝ってくれる。"],
     "솔 · 광장 파수꾼": ["Sol · Plaza Keeper", "ソル・広場の番人"],
@@ -154,7 +358,7 @@ const DuskLanguage = (() => {
     "계속하기": ["Resume", "再開"],
     "내 빌드": ["My build", "装備構成"],
     "타이틀로": ["Title screen", "タイトルへ"],
-    "빗자루를 내려놓고 잠시 쉬어 갑니다.": ["Set your broom down and take a breather.", "ほうきを置いて、ひと休み。"],
+    "도구를 내려놓고 잠시 쉬어 갑니다.": ["Set your broom down and take a breather.", "ほうきを置いて、ひと休み。"],
     "홈 화면에 설치": ["Install on home screen", "ホーム画面に追加"],
     "홈 화면에 설치하려면 Safari의 공유 메뉴에서 ‘홈 화면에 추가’를 선택하세요.": ["In Safari, open the Share menu and select “Add to Home Screen”.", "Safariの共有メニューで「ホーム画面に追加」を選んでください。"],
     "수동 빗질 적중": ["Manual sweep hit", "手動の掃撃が命中"],
@@ -274,7 +478,7 @@ const DuskLanguage = (() => {
     "나루": ["Landing", "渡し場"],
     "제련소": ["Smelter", "製錬所"],
     "황혼의 청소부 · Dusk Janitor": ["Dusk Janitor", "黄昏の清掃員 · Dusk Janitor"],
-    "황혼의 청소부 던전. 방향키 또는 WASD로 이동하고, 스페이스바나 마우스 클릭으로 빗자루를 휘두르세요. Shift로 회피합니다.": ["Dusk Janitor dungeon. Move with the arrow keys or WASD, swing with Space or click, and dodge with Shift.", "黄昏の清掃員。矢印キーまたはWASDで移動、スペースまたはクリックで掃撃、Shiftで回避。"],
+    "쓱싹 대작전 던전. 방향키 또는 WASD로 이동하고, 스페이스바나 마우스 클릭으로 주 무기로 공격하세요. Shift로 회피합니다.": ["Operation Clean Sweep dungeon. Move with the arrow keys or WASD, swing with Space or click, and dodge with Shift.", "おそうじ大作戦。矢印キーまたはWASDで移動、スペースまたはクリックで掃撃、Shiftで回避。"],
     "생존 시간": ["Survival time", "生存時間"],
     "게임 설정": ["Game settings", "ゲーム設定"],
     "던전 지도": ["Dungeon map", "ダンジョンマップ"],

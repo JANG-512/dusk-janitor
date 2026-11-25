@@ -338,9 +338,57 @@ const DuskArt = (() => {
     return sprite;
   }
 
+  // The weapon and hands share the same pivot as the lean of the upper body.
+  function drawStroke(ctx, role, stroke, phase, side, lean) {
+    const mop = role === 'sweeper';
+    const hose = role === 'keeper';
+    const angle = Math.atan2(stroke.dy, stroke.dx * side);
+    ctx.save();
+    ctx.translate(lean.x, -9 + lean.y);
+    ctx.rotate(angle);
+    const R=(x,y,w,h,color)=>rect(ctx,x,y,w,h,color);
+    if (hose) {
+      const kick = Math.sin(Math.min(1,phase*1.6)*Math.PI);
+      const muzzle = Math.min(stroke.reach,14-3*kick);
+      if (phase < .83 && stroke.reach > muzzle) {
+        const length = stroke.reach-muzzle;
+        R(muzzle,-1,length,3,'#59abda');
+        R(muzzle,0,length,1,'#dcfff6');
+        for(let x=muzzle+3;x<stroke.reach;x+=7)
+          R(x,Math.sin(x+phase*15)*2,2,1,'#a8eaf0');
+      }
+      R(2,-1,5,3,'#487ba0');R(5,0,3,3,'#d8aa83');
+      R(5,-3,Math.max(3,muzzle-5),3,'#829faa');R(muzzle-2,-4,3,5,'#ebc978');
+    } else {
+      const drive = phase<.18 ? .72+.28*phase/.18 : Math.cos((phase-.18)/.82*Math.PI/2);
+      const tip = Math.max(6,stroke.reach*drive);
+      if (!mop) ctx.rotate(-.43+1.16*phase);
+      R(0,-1,tip,2,mop?'#b58c69':'#ab7950');
+      R(1,-1,Math.max(1,tip-4),1,'#edd0a0');
+      if (mop) {
+        R(tip-4,-5,3,10,'#4c928b');
+        for(let y=-4;y<=4;y+=2) R(tip-1,y,2+(y+4)%3,2,'#c1dec9');
+      } else {
+        for(let i=0;i<5;i++) R(tip-6+i,-2-i*.5,2,4+i,'#ddab65');
+        for(let y=-3;y<=3;y+=2) R(tip-1,y,2,1,'#ffe09a');
+      }
+      R(1,-2,4,4,mop?'#79b9a0':'#b85f41');
+      R(4,-2,3,3,'#e2ad87');
+      if(mop) R(Math.min(tip-2,8+drive*3),-1,3,3,'#edc19b');
+    }
+    ctx.restore();
+  }
+
   function drawHero(ctx, hero, time) {
     const art=crewArt[hero.role] || crewArt.sweeper;
-    const side=hero.facing.x < -.05 ? -1 : 1;
+    const stroke=hero.stroke;
+    const phase=stroke ? (time-stroke.start)/stroke.duration : 1;
+    const active=phase>=0 && phase<1;
+    const side=(active ? stroke.dx : hero.facing.x) < -.05 ? -1 : 1;
+    const push=active ? Math.sin(Math.PI*(.22+.78*phase)) : 0;
+    const stride=hero.role==='keeper' ? -2 : hero.role==='sweeper' ? 4 : 3;
+    const lean={x:active ? Math.round(stroke.dx*side*stride*push) : 0,
+      y:active ? Math.round(stroke.dy*stride*push + (hero.role==='alchemist' ? push : 0)) : 0};
     const step=hero.moving ? Math.floor(time*12)%2 : 0;
     pixelEllipse(ctx,hero.x,hero.y,art.boots+5,3,'#242035b8',2);
     ctx.save();
@@ -349,14 +397,30 @@ const DuskArt = (() => {
     if(hero.invulnerable>0 && Math.floor(time*18)%2) ctx.globalAlpha=.45;
     const R=(x,y,w,h,color)=>rect(ctx,x,y,w,h,color);
     for(const foot of [-1,1]){
-      const x=foot*art.boots-2;
+      const x=foot*art.boots-2+(active ? Math.round(foot*push*2) : 0);
       const y=step && foot===1 ? -1 : 0;
       R(x,y-5,4,5,'#303442');
       R(x,y-2,5,3,art.sole);
       R(x,y,5,1,'#292834');
     }
     ctx.translate(0,-step);
+    const behind=active && stroke.dy<-.45;
+    if (behind) drawStroke(ctx,hero.role,stroke,phase,side,lean);
+    ctx.save();
+    ctx.translate(lean.x,lean.y);
+    if(active && hero.role==='alchemist') ctx.transform(1,0,.16*Math.cos(phase*Math.PI),1,0,0);
     ctx.drawImage(bodySprite(art),art.left,art.top);
+    ctx.restore();
+    if(active){
+      if(hero.role==='keeper'){
+        R(-7+lean.x,-6+lean.y,2,6,'#488f89');
+        R(-6+lean.x,-1+lean.y,9,2,'#71b8a3');
+        R(2+lean.x,-7+lean.y,2,7,'#488f89');
+      }
+      if(!behind) drawStroke(ctx,hero.role,stroke,phase,side,lean);
+      ctx.restore();
+      return;
+    }
     if(hero.role==='keeper'){
       // Return hose loops from the backpack to a brass trigger nozzle.
       R(-8,-5,2,5,'#488f89');R(-7,-1,11,2,'#488f89');

@@ -189,6 +189,7 @@
       run.fieldCooldown = 0;
       run.charges = [];
     }
+    hero.stroke = null;
     run.slicks = [];
     camera = { x: hero.x, y: hero.y };
     monsters = [];
@@ -1187,6 +1188,7 @@
       run.repairUntil = run.time + 1.45-.22*talent(2);
       run.timers.broom = run.repairUntil-run.time;
       run.justRepaired = true;
+      hero.stroke = null;
       announce('호스 수리',run.timers.broom);
       tone(150,57,.14,'square');
       return;
@@ -1204,7 +1206,10 @@
     };
     hero.facing = aim;
     const end = {x:hero.x+aim.x*reach,y:hero.y+aim.y*reach};
-    effects.push({kind:'tool',role,x:hero.x,y:hero.y-5,angle:Math.atan2(aim.y,aim.x),radius:reach,life:.19,full:.19});
+    hero.stroke = {
+      start:run.time, duration:Math.min(attackInterval(roles[role].interval), hose ? .19 : .34),
+      dx:aim.x, dy:aim.y, reach
+    };
     if (hose) washStripe(hero,end);
     cooldown('broom',roles[role].interval);
     run.swings++;
@@ -1643,29 +1648,12 @@
     for (const fx of effects) {
       const fade = Math.min(1, fx.life * 5);
       ctx.globalAlpha = fade;
-      if (fx.kind === 'tool' || fx.kind === 'gust') {
+      if (fx.kind === 'gust') {
         const t=1-fx.life/fx.full;
-        ctx.save();
-        ctx.translate(fx.x,fx.y);
-        if (fx.kind==='gust') {
-          for(let i=0;i<42;i++){
-            const a=i*.85+t*9, radius=fx.radius*(i%13)/13;
-            box(Math.cos(a)*radius,Math.sin(a)*radius*.4-(i%13)-t*9,3,2,i%2?'#f4cf85':'#bc905e');
-          }
-        } else {
-          ctx.rotate(fx.angle);
-          const length=fx.radius*(.6+.4*Math.sin(t*Math.PI));
-          if (fx.role==='keeper') {
-            box(0,-2,fx.radius,4,'#67bedf');box(3,-1,Math.max(0,fx.radius-3),1,'#e2fff9');
-            for(let i=3;i<fx.radius;i+=7)box(i,Math.sin(t*10+i)*3,2,2,'#a1e8ff');
-          } else {
-            if(fx.role==='alchemist')ctx.rotate((t-.5)*.57);
-            box(0,-1,length,2,'#c49972');
-            box(length-5,-4,5,8,fx.role==='sweeper'?'#7ac6c3':'#e2bb76');
-            for(let i=-3;i<=3;i+=2)box(length,i,4,1,'#f0ead1');
-          }
+        for(let i=0;i<42;i++){
+          const a=i*.85+t*9, radius=fx.radius*(i%13)/13;
+          box(fx.x+Math.cos(a)*radius,fx.y+Math.sin(a)*radius*.4-(i%13)-t*9,3,2,i%2?'#f4cf85':'#bc905e');
         }
-        ctx.restore();
       } else if (fx.kind === 'bolt') {
         ctx.strokeStyle=fx.color;
         ctx.lineWidth=2;

@@ -190,7 +190,7 @@
     ui.hud.inert = false;
     ui.hint.hidden = false;
     ui['map-seed'].textContent = (seed >>> 0).toString(36).toUpperCase().padStart(4, '0').slice(-4);
-    ui.pause.setAttribute('aria-label', '일시 정지');
+    DuskLanguage.bind(ui.pause, 'aria-label', '일시 정지');
     resetInput();
     activate(currentRoom, true);
     if (run.bossLevel) spawnBatch(currentRoom,run.bossLevel);
@@ -200,7 +200,7 @@
   }
 
   function announce(text, duration = 2.8) {
-    ui.message.textContent = text;
+    DuskLanguage.bind(ui.message, 'text', text);
     noticeUntil = run.time + duration;
   }
 
@@ -297,7 +297,9 @@
     if (name === 'broom' && run.extension) slot.title += ' · 사거리 +' + run.extension;
     if (name === 'broom' && run.echo) slot.title += ' · 공명 피해 ' + run.echo;
     slot.setAttribute('role', 'img');
-    slot.setAttribute('aria-label', slot.title);
+    const description = slot.title;
+    DuskLanguage.bind(slot, 'title', description);
+    DuskLanguage.bind(slot, 'aria-label', description);
     slot.innerHTML = svg(weaponData[name].icon) + (level ? '<b>' + level + '</b>' : '');
     return slot;
   }
@@ -325,7 +327,7 @@
     if(run.fogUntil>run.time) lines.push('달안개 '+remaining(run.fogUntil-run.time));
     if(run.mirrorUntil>run.time) lines.push('반전 '+remaining(run.mirrorUntil-run.time));
     const display = lines.join('\n');
-    if (uiState.combatText !== display) ui.combat.textContent = uiState.combatText = display;
+    if (uiState.combatText !== display) DuskLanguage.bind(ui.combat, 'text', uiState.combatText = display);
   }
 
   const cardInterval = () => 18 + 2 * Math.floor((run.level - 1) / 3);
@@ -361,9 +363,9 @@
     panel.hidden = false;
     panel.classList.toggle('curse', curse);
     ui['card-sigil'].textContent = ['♬','◇','◈','≋','✦','❄','†','≈'][id];
-    ui['card-state'].textContent = curse ? '저주 · 즉시 발동' : card.kind + ' · 손패에 추가';
-    ui['card-name'].textContent = card.name;
-    ui['card-effect'].textContent = card.desc;
+    DuskLanguage.bind(ui['card-state'], 'text', curse ? '저주 · 즉시 발동' : card.kind + ' · 손패에 추가');
+    DuskLanguage.bind(ui['card-name'], 'text', card.name);
+    DuskLanguage.bind(ui['card-effect'], 'text', card.desc);
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
       panel.animate([{opacity:0,transform:'perspective(320px) rotateY(-72deg) translateY(10px)'},{opacity:1,transform:'none'}],{duration:380,easing:'ease-out'});
     }
@@ -393,7 +395,7 @@
         if (!run.bossLevel && run.xp >= run.need) levelUp();
       });
       button.className='choice';
-      button.innerHTML='<b>'+card.name+' ×'+count+'</b><small>'+card.kind+' · '+card.desc+'</small>';
+      button.innerHTML='<b>'+DuskLanguage.translate(card.name)+' ×'+count+'</b><small>'+DuskLanguage.translate(card.kind)+' · '+DuskLanguage.translate(card.desc)+'</small>';
       return button;
     });
     buttons.push(action('닫기',resume,true));
@@ -403,10 +405,10 @@
   function updateHud() {
     updateCombatHud();
     const handText='카드 '+run.hand.length+' · '+run.cardKills+'/'+cardInterval();
-    if(ui.cards.textContent!==handText) ui.cards.textContent=handText;
+    if(uiState.handText!==handText) DuskLanguage.bind(ui.cards, 'text', uiState.handText = handText);
     if (uiState.blastKills !== run.blastKills) {
       uiState.blastKills = run.blastKills;
-      ui.contract.textContent = run.blastKills === 3 ? '✓ 폭파 의뢰 완료' : '폭파 의뢰 · 폭발로 처치 ' + run.blastKills + '/3';
+      DuskLanguage.bind(ui.contract, 'text', run.blastKills === 3 ? '✓ 폭파 의뢰 완료' : '폭파 의뢰 · 폭발로 처치 ' + run.blastKills + '/3');
     }
     const second = Math.floor(run.time);
     if (uiState.second !== second) {
@@ -415,16 +417,16 @@
     }
     if (uiState.room !== currentRoom.id) {
       uiState.room = currentRoom.id;
-      ui.region.textContent = (hardMode ? '하드 · ' : '') + (dungeon.regionIndex + 1) + '구역 · ' + currentRoom.theme.name;
+      DuskLanguage.bind(ui.region, 'text', (hardMode ? '하드 · ' : '') + (dungeon.regionIndex + 1) + '구역 · ' + currentRoom.theme.name);
     }
     if (uiState.clean !== run.clean) {
       uiState.clean = run.clean;
-      ui['area-progress'].textContent = '정화 ' + run.clean + ' / ' + dungeon.rooms.length;
+      DuskLanguage.bind(ui['area-progress'], 'text', '정화 ' + run.clean + ' / ' + dungeon.rooms.length);
     }
     if (uiState.hp !== hero.hp || uiState.max !== hero.max) {
       uiState.hp = hero.hp;
       uiState.max = hero.max;
-      ui.health.setAttribute('aria-label', '체력 ' + hero.hp + ' / ' + hero.max);
+      DuskLanguage.bind(ui.health, 'aria-label', '체력 ' + hero.hp + ' / ' + hero.max);
       ui.health.replaceChildren(...Array.from({ length: hero.max }, (_, i) => {
         const span = document.createElement('i');
         span.className = 'heart' + (i >= hero.hp ? ' empty' : '');
@@ -437,7 +439,7 @@
     const boss = run.bossLevel && monsters.find(m => m.bossLevel && m.hp > 0);
     const encounter = boss ? (boss.bossLevel === 50 ? '황혼의 종지기' : '자정의 종지기')+' · '+boss.hp+'/'+boss.maxHp : currentRoom.state === 'clean' ? '이 구역 정화 완료' :
       '무리 ' + currentRoom.spawned + ' / ' + currentRoom.batches + ' · 정화 ' + Math.round(currentRoom.resolved / currentRoom.total * 100) + '%';
-    if (uiState.encounter !== encounter) ui.encounter.textContent = uiState.encounter = encounter;
+    if (uiState.encounter !== encounter) DuskLanguage.bind(ui.encounter, 'text', uiState.encounter = encounter);
     const weapons = Object.keys(weaponData).map(key => run.weapons[key] ?? 0).concat(run.extension, run.echo).join('/');
     if (uiState.weapons !== weapons) {
       uiState.weapons = weapons;
@@ -458,7 +460,7 @@
     const button = document.createElement('button');
     button.type = 'button';
     button.className = secondary ? 'action secondary' : 'action';
-    button.textContent = label;
+    DuskLanguage.bind(button, 'text', label);
     button.onclick = select;
     return button;
   }
@@ -468,9 +470,9 @@
     mode = next;
     lastFocus = document.activeElement;
     resetInput();
-    ui['dialog-label'].textContent = label;
-    ui['dialog-title'].textContent = title;
-    ui['dialog-detail'].textContent = detail;
+    DuskLanguage.bind(ui['dialog-label'], 'text', label);
+    DuskLanguage.bind(ui['dialog-title'], 'text', title);
+    DuskLanguage.bind(ui['dialog-detail'], 'text', detail);
     ui['dialog-actions'].replaceChildren(...buttons);
     ui.modal.hidden = false;
     ui.hud.inert = true;
@@ -538,8 +540,9 @@
     game.style.setProperty('--control-opacity',settings.opacity / 100);
     ui.map.parentElement.hidden = !settings.map;
     ui.sound.setAttribute('aria-pressed',String(settings.sound));
-    ui.sound.title = muted ? '소리 켜기' : '소리 끄기';
-    ui.sound.setAttribute('aria-label',ui.sound.title);
+    const soundLabel = muted ? '소리 켜기' : '소리 끄기';
+    DuskLanguage.bind(ui.sound, 'title', soundLabel);
+    DuskLanguage.bind(ui.sound, 'aria-label', soundLabel);
     if (save) {
       try { localStorage.setItem('dusk-settings',JSON.stringify(settings)); } catch { /* Keep session preferences. */ }
     }
@@ -556,6 +559,7 @@
     buttons.push(action(sessionStarted ? '새 탐험 준비' : '탐험 준비',()=>{hardMode=false;selectRole();}),action('설정',()=>settingsScreen(titleScreen),true));
     if (hardUnlocked) buttons.push(action('하드모드 탐험',()=>{hardMode=true;selectRole();}));
     dialog('title','DUSK JANITOR','황혼의 청소부','달안개 마을의 마지막 야간 근무',buttons);
+    ui['dialog-actions'].append(DuskLanguage.selector());
   }
   function selectRole() {
     const cards = Object.entries(roles).map(([key,data])=>{
@@ -572,9 +576,9 @@
       portrait.height = 32;
       drawHero(portrait.getContext('2d'),{x:18,y:27,facing:{x:1,y:0},role:key,scarf:data.color},0);
       const name = document.createElement('b');
-      name.textContent = data.name;
+      DuskLanguage.bind(name, 'text', data.name);
       const desc = document.createElement('small');
-      desc.textContent = data.start;
+      DuskLanguage.bind(desc, 'text', data.start);
       button.append(portrait,name,desc);
       return button;
     });
@@ -593,7 +597,7 @@
     for (const [heading,items] of groups) {
       const group = document.createElement('fieldset');
       const legend = document.createElement('legend');
-      legend.textContent = heading;
+      DuskLanguage.bind(legend, 'text', heading);
       group.append(legend);
       for (const [key,name,min,max] of items) {
         const label = document.createElement('label');
@@ -611,12 +615,14 @@
           applySettings();
           if (key==='sound' || key==='volume') unlockAudio().then(()=>tone(440,630,.08));
         };
-        label.append(name,input,value);
+        const caption = document.createElement('span');
+        DuskLanguage.bind(caption, 'text', name);
+        label.append(caption,input,value);
         group.append(label);
       }
       form.append(group);
     }
-    ui['dialog-actions'].prepend(form);
+    ui['dialog-actions'].prepend(DuskLanguage.selector(), form);
   }
 
   let installPrompt;
@@ -748,19 +754,19 @@
     for(const [i,slot] of run.circuits.entries()) {
       const field=document.createElement('fieldset');
       const legend=document.createElement('legend');
-      legend.textContent='조합 슬롯 '+(i+1);
+      DuskLanguage.bind(legend, 'text', '조합 슬롯 '+(i+1));
       field.append(legend);
       const preview=document.createElement('p');
       const refresh=()=>{
         const stats=specs(slot);
         const prerequisite = {spray:'분무기 탄환이 필요합니다. ', ally:'임시 동료가 필요합니다. ', blast:'오염 통, 기폭제 또는 앞 슬롯의 정화탄 폭발로 발동합니다. '}[slot.trigger] ?? '';
-        preview.textContent=prerequisite + formulas[slot.formula][1]+' 피해 '+stats.power+' · 반경 '+stats.radius+' · 재사용 '+stats.delay.toFixed(1)+'초 · 발동 '+slot.count+'회';
+        DuskLanguage.bind(preview, 'text', prerequisite + formulas[slot.formula][1]+' 피해 '+stats.power+' · 반경 '+stats.radius+' · 재사용 '+stats.delay.toFixed(1)+'초 · 발동 '+slot.count+'회');
       };
       for(const [key,label,items] of [['trigger','조건',triggers],['formula','효과',formulas],['style','개조',styles]]) {
         const row=document.createElement('label');
-        row.textContent=label;
+        DuskLanguage.bind(row, 'text', label);
         const select=document.createElement('select');
-        for(const [value,text] of Object.entries(items)) select.add(new Option(Array.isArray(text)?text[0]:text,value));
+        for(const [value,text] of Object.entries(items)) select.add(new Option(DuskLanguage.translate(Array.isArray(text)?text[0]:text),value));
         select.value=slot[key];
         select.onchange=()=>{slot[key]=select.value;refresh();};
         row.append(select);
@@ -775,7 +781,7 @@
       ...[...utility,...modules].map(data=>[data.label,run.bonus[data.key]]),
       ...roles[role].paths.map(([name],i)=>[name,run.bonus[role+i]]),
       ['빗살 추가 사거리',run.extension], ['공명 피해',run.echo], ['기폭제 피해',run.catalyst && 2+run.catalyst]];
-    inventory.textContent=(run.level<4?'Lv.4에서 두 번째 슬롯 개방 · ':'')+owned.filter(([,lv])=>lv).map(([name,lv])=>name+' '+lv).join(' · ');
+    DuskLanguage.bind(inventory, 'text', (run.level<4?'Lv.4에서 두 번째 슬롯 개방 · ':'')+owned.filter(([,lv])=>lv).map(([name,lv])=>name+' '+lv).join(' · '));
     book.append(inventory);
     ui['dialog-actions'].prepend(book);
   }
@@ -819,7 +825,7 @@
       const next = (holder[option.key] ?? 0) + 1;
       button.type = 'button';
       button.className = 'choice';
-      button.innerHTML = svg(option.icon) + '<b>' + option.label + ' Lv.' + next + '</b><small>' + option.desc + '</small>';
+      button.innerHTML = svg(option.icon) + '<b>' + DuskLanguage.translate(option.label) + ' Lv.' + next + '</b><small>' + DuskLanguage.translate(option.desc) + '</small>';
       button.onclick = () => {
         holder[option.key] = next;
         if (option.key === 'sweeper0') run.echo += 2;
@@ -1375,7 +1381,7 @@
     run.time += dt;
     updateReveal();
     run.shake = Math.max(0, run.shake - dt);
-    if (run.time >= noticeUntil && ui.message.textContent) ui.message.textContent = '';
+    if (run.time >= noticeUntil && ui.message.textContent) DuskLanguage.bind(ui.message, 'text', '');
     if (run.time > 8 && !ui.hint.hidden) ui.hint.hidden = true;
     if (run.hints < hints.length && run.time > [5, 17, 37][run.hints] && run.time >= noticeUntil) {
       announce(hints[run.hints++], 4);
@@ -1383,7 +1389,7 @@
     updateHero(dt);
     const station = nearbyStation();
     ui.interact.hidden = !station;
-    if (station) ui.interact.textContent = 'E · ' + stationNames[station.kind];
+    if (station) DuskLanguage.bind(ui.interact, 'text', 'E · ' + stationNames[station.kind]);
     camera.x = Math.round(hero.x);
     camera.y = Math.round(hero.y);
     if (currentRoom.state === 'active' && currentRoom.spawned < currentRoom.batches) {
@@ -1507,7 +1513,7 @@
         if(run.mirrorUntil>run.time) ctx.scale(-1,1);
         ctx.strokeText(fx.text,0,0);
         ctx.fillStyle = fx.color;
-        ctx.fillText(fx.text,0,0);
+        ctx.fillText(DuskLanguage.translate(fx.text),0,0);
         ctx.restore();
       } else {
         const progress = 1 - fx.life / fx.full;
@@ -1812,8 +1818,8 @@
     const full = Boolean(document.fullscreenElement);
     const label = full ? '전체 화면 끄기' : '전체 화면 켜기';
     ui.fullscreen.setAttribute('aria-pressed', String(full));
-    ui.fullscreen.setAttribute('aria-label', label);
-    ui.fullscreen.title = label;
+    DuskLanguage.bind(ui.fullscreen, 'aria-label', label);
+    DuskLanguage.bind(ui.fullscreen, 'title', label);
     resize();
   });
 

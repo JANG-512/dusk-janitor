@@ -225,3 +225,19 @@ input, select, option {font-family:inherit;}
 #card-name {font-size:16px;margin:2px 0;}
 #card-effect {font-size:12px;line-height:1.45;word-break:keep-all;}
 @media (max-height:480px) and (orientation:landscape) {#card-reveal{top:18%;width:min(250px,38%);padding:6px;}}
+
+.language-choice {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .75em;
+  padding: .3em;
+}
+.language-choice select {
+  font: inherit;
+  color: var(--text);
+  background: #332a3d;
+  border: 1px solid #806c88;
+  padding: .35em .6em;
+}

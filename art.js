@@ -244,54 +244,135 @@ const DuskArt = (() => {
     }
   }
 
-  function drawHero(ctx, hero, time) {
-    const { x, y } = hero;
-    const side = hero.facing.x < -.05 ? -1 : 1;
-    const step = hero.moving ? Math.floor(time * 13) % 2 : 0;
-    pixelEllipse(ctx, x, y, 8, 3, '#242035b8', 2);
-    ctx.save();
-    if (hero.invulnerable > 0 && Math.floor(time * 18) % 2) ctx.globalAlpha = .45;
-    rect(ctx, x - 5, y - 6, 10, 5, '#363549');
-    rect(ctx, x - 4, y - 4 - step, 3, 5, '#211e2e');
-    rect(ctx, x + 1, y - 4 + step, 3, 4, '#211e2e');
-    rect(ctx, x - 5, y - 11, 10, 7, '#c69a62');
-    rect(ctx, x - 3, y - 10, 6, 7, '#826b8c');
-    rect(ctx, x - 2, y - 9, 4, 2, '#b997bd');
-    rect(ctx, x - 4, y - 15, 8, 6, '#edd0ad');
-    rect(ctx, x + side * 2, y - 13, 1, 2, '#3a2c40');
-    rect(ctx, x - 6, y - 16, 12, 2, '#3a334b');
-    rect(ctx, x - 4, y - 19, 8, 4, '#d5b580');
-    rect(ctx, x - 3, y - 19, 6, 1, '#f2d8a3');
-    // A tied scarf, tool belt and stitched satchel follow the cleaner's stride.
-    rect(ctx,x-4,y-11,8,2,hero.scarf || '#69ada0');
-    rect(ctx,x-side*6,y-11+step,3,4,'#48877e');
-    rect(ctx,x-5,y-6,10,2,'#564151');
-    rect(ctx,x,y-6,2,2,'#f3cb83');
-    rect(ctx,x-side*5-2,y-8,4,5,'#935e52');
-    rect(ctx,x-side*5-2,y-8,4,1,'#dfad77');
-    rect(ctx,x-5,y-17,10,2,'#987054');
-    rect(ctx,x-7,y-16,14,1,'#edce94');
-    if (hero.role === 'alchemist') {
-      rect(ctx,x-4,y-16,9,3,'#4b3a53');
-      rect(ctx,x-3,y-16,3,2,'#a9dfda');
-      rect(ctx,x+2,y-16,2,2,'#a9dfda');
-      rect(ctx,x-6,y-6,3,4,'#f29479');
-    } else if (hero.role === 'keeper') {
-      rect(ctx,x-6,y-20,3,5,'#a488be');
-      rect(ctx,x-7,y-21,2,3,'#d3afdb');
-      rect(ctx,x+5,y-7,3,4,'#a9e5b3');
+  // Each coat, face and headpiece is drawn at its native pixel size.
+  const crewArt = {
+    sweeper: {
+      top:-24, left:-7, boots:3, sole:'#385b59',
+      palette:{h:'#566976',H:'#d1d1bc',w:'#ffeed0',s:'#d99d7a',f:'#efc29c',k:'#312e3b',g:'#478b80',G:'#84c6aa',a:'#3e685f',A:'#689681',p:'#edd8a4'},
+      rows:[
+        '  hHHh       ',
+        ' hHwwHhh     ',
+        '  hHHHHHhh   ',
+        '    hHwwHHh  ',
+        '    hHsfffs  ',
+        '    hHffskf  ',
+        '     sfffffs ',
+        '     sfHwwH  ',
+        '     hswHH   ',
+        '    ggwwgg   ',
+        '   gGGpGGpg  ',
+        '   GGGapApg  ',
+        '  gGGgAAAAgg ',
+        '  sffgaAAAgs ',
+        '  sssgAppAgf ',
+        '     aAaaAas ',
+        '    aaAAAAAa ',
+        '    aAAAAAAa ',
+        '    aaaAAaaa ',
+        '    aAAaaAAa '
+      ]
+    },
+    alchemist: {
+      top:-20,left:-9,boots:4,sole:'#76483d',
+      palette:{h:'#312e37',H:'#594048',b:'#a44f3c',B:'#f39c5f',s:'#b5775b',f:'#e2a87b',k:'#272936',j:'#834738',J:'#c76a46',v:'#f2b36d',p:'#485063',P:'#797984'},
+      rows:[
+        '      hhhHhh    ',
+        '    hhhHHhhHh   ',
+        '   bbBBBBBBBBb  ',
+        '  Bbbssffhfff   ',
+        ' Bb  ssffkkfk   ',
+        ' b   sfffffff   ',
+        '     shhHHhhh   ',
+        '      shhhhs    ',
+        '   bbJJvvvJbb   ',
+        '  bJJJvJJJvJJb  ',
+        ' bJJJbvJJJvbJJb ',
+        ' sffsbJvvvJbsffs',
+        ' sss bJJJJJb sss',
+        '     hhPvPhh    ',
+        '    pPPppPPp    ',
+        '    pPPp pPPp   '
+      ]
+    },
+    keeper: {
+      top:-23,left:-10,boots:3,sole:'#a88b50',
+      palette:{d:'#364459',c:'#317da0',C:'#68c1db',w:'#d1f7ed',v:'#edae54',V:'#ffe097',s:'#aa735d',f:'#d7a383',k:'#293648',j:'#34587a',J:'#487ba0'},
+      rows:[
+        '        vVVv   ',
+        '      vvVVVVvv ',
+        '     vVVVVvvVv ',
+        '     vvvvvvvvvv',
+        '      kwwkwwk  ',
+        '   dd ckCkCCk  ',
+        '  dwwd sfffff  ',
+        '  cCCc sfkkfs  ',
+        '  cwCc  ssss   ',
+        ' dCwCcdvvVVvd  ',
+        ' dCwCcjJvJJvJd ',
+        ' dCwCcjJvJJvJJ ',
+        ' dCwCcdJvJJvJJ ',
+        ' dCwCcdJJJJJsf ',
+        ' dcCCcdVVVVVsf ',
+        '  ddddkjjJJjd  ',
+        '     djJJJJJd  ',
+        '      jJJjJJj  ',
+        '      djJdjJd  '
+      ]
     }
-    const grip=x+side*7;
+  };
+
+  const crewBodies = new Map();
+  function bodySprite(art) {
+    if (crewBodies.has(art)) return crewBodies.get(art);
+    const sprite = document.createElement('canvas');
+    sprite.width = Math.max(...art.rows.map(row => row.length));
+    sprite.height = art.rows.length;
+    const brush = sprite.getContext('2d');
+    art.rows.forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        const color = art.palette[row[x]];
+        if (color) rect(brush, x, y, 1, 1, color);
+      }
+    });
+    crewBodies.set(art, sprite);
+    return sprite;
+  }
+
+  function drawHero(ctx, hero, time) {
+    const art=crewArt[hero.role] || crewArt.sweeper;
+    const side=hero.facing.x < -.05 ? -1 : 1;
+    const step=hero.moving ? Math.floor(time*12)%2 : 0;
+    pixelEllipse(ctx,hero.x,hero.y,art.boots+5,3,'#242035b8',2);
+    ctx.save();
+    ctx.translate(Math.round(hero.x),Math.round(hero.y));
+    ctx.scale(side,1);
+    if(hero.invulnerable>0 && Math.floor(time*18)%2) ctx.globalAlpha=.45;
+    const R=(x,y,w,h,color)=>rect(ctx,x,y,w,h,color);
+    for(const foot of [-1,1]){
+      const x=foot*art.boots-2;
+      const y=step && foot===1 ? -1 : 0;
+      R(x,y-5,4,5,'#303442');
+      R(x,y-2,5,3,art.sole);
+      R(x,y,5,1,'#292834');
+    }
+    ctx.translate(0,-step);
+    ctx.drawImage(bodySprite(art),art.left,art.top);
     if(hero.role==='keeper'){
-      rect(ctx,x-side*7-2,y-12,5,10,'#447b91');
-      rect(ctx,grip-2,y-9,5,3,'#8dbecc');
-      rect(ctx,grip+side*3,y-10,3,4,'#eee2bb');
-      rect(ctx,grip-1,y-7,2,7,'#598a77');
+      // Return hose loops from the backpack to a brass trigger nozzle.
+      R(-8,-5,2,5,'#488f89');R(-7,-1,11,2,'#488f89');
+      R(3,-3,4,2,'#71b8a3');R(6,-8,2,6,'#488f89');
+      R(6,-10,6,4,'#344555');R(8,-10,5,2,'#afd7d5');
+      R(12,-11,3,4,'#e6bd72');R(6,-8,3,2,'#e2ab80');
+    }else if(hero.role==='alchemist'){
+      // A short, angled fan broom leaves the wide shoulders visible.
+      for(let i=0;i<8;i++) R(5+i,-10+i,2,2,'#b9895b');
+      R(9,-7,3,3,'#76483d');R(10,-5,5,3,'#dfaa64');
+      R(11,-3,5,3,'#eec27a');R(13,0,3,1,'#a56c47');
+      R(10,-4,2,2,'#ffdb91');R(6,-9,3,2,'#e2a87b');
     }else{
-      rect(ctx,grip-1,y-15,2,15,'#ac8a6e');
-      const mop=hero.role==='sweeper';
-      rect(ctx,grip-3,y-3,6,4,mop?'#99c7bf':'#d2a164');
-      for(let n=0;n<3;n++)rect(ctx,grip-3+n*2,y,1,3+n%2,mop?'#d6e6d2':'#f1ca83');
+      R(8,-23,2,22,'#8b715b');R(8,-23,1,21,'#d8b586');
+      R(7,-12,3,3,'#efc29c');R(6,-3,7,2,'#5e9797');
+      for(let i=0;i<5;i++) R(6+i,-1,1,3+i%2,i%2?'#91beb4':'#dce9d1');
     }
     ctx.restore();
   }

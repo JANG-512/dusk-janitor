@@ -279,3 +279,61 @@ input, select, option {font-family:inherit;}
 .bench-part:disabled {opacity:.55;}
 #dialog-actions:has(.bench-part) .secondary {flex-basis:100%;}
 @media(max-width:480px){.bench-part{flex-basis:100%;grid-template-columns:1fr auto;align-items:center;gap:3px 8px;}.bench-part small{grid-column:2;grid-row:1;}.bench-part b{grid-column:1;grid-row:1;}}
+
+.field-stack,.field-dock {display:contents;}
+.room-code {flex-basis:100%;text-align:center;letter-spacing:.22em;padding:10px;color:var(--text);background:#211e2c;border:1px solid #8b778e;font:inherit;text-transform:uppercase;}
+.targets {display:grid;width:100%;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;}
+.targets button {min-height:44px;}
+@media(pointer:coarse){
+  .field-stack {position:absolute;left:var(--x);top:var(--y);display:flex;align-items:flex-start;flex-direction:column;gap:3px;max-width:50%;}
+  .field-stack :is(.identity,.status,.contract,.encounter){position:static;}
+  .field-stack .encounter{order:2;}
+  .field-stack .contract{order:3;}
+  .field-stack #combat{position:absolute;z-index:3;min-width:min(210px,60vw);max-height:24vh;overflow:auto;touch-action:pan-y;pointer-events:auto;}
+  .toolbox button,#cards,#combat-toggle,#interact,.loadout{min-width:44px;min-height:44px;}
+  .toolbox button{width:44px;height:44px;}
+  .health{flex-wrap:wrap;max-width:100%;}
+  .field-dock{position:absolute;bottom:max(7px,env(safe-area-inset-bottom));left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px;}
+  .field-dock :is(.experience,.loadout){position:static;transform:none;width:auto;margin:0;}
+  .field-dock .loadout{align-items:center;}
+  .field-dock .slot{width:24px;height:25px;}
+  #stick,#sweep{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 54px);}
+  #dash{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 124px);}
+  .message,#card-reveal{top:auto;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 190px);max-width:min(80vw,380px);}
+  #card-reveal:not([hidden]) ~ .message{visibility:hidden;}
+  #interact{top:56%;max-width:44%;}
+  .hud .run-clock{pointer-events:none;}
+}
+@media(pointer:coarse) and (max-width:600px){
+  .toolbox #sound,.toolbox #fullscreen{display:none;}
+  .field-stack{max-width:49%;}
+  .field-stack .identity{grid-template-columns:auto;}.field-stack .game-mark{display:none;}
+  .field-stack .health{gap:2px;margin-top:3px;}
+}
+@media(pointer:coarse) and (orientation:landscape) and (max-height:520px){
+  .field-dock{left:27%;right:27%;gap:6px;}
+  #stick,#sweep{bottom:max(8px,env(safe-area-inset-bottom));}
+  #dash{bottom:max(14px,env(safe-area-inset-bottom));}
+  .message,#card-reveal{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 55px);max-width:44%;}
+}
+.segmented .modal{inset:var(--pane-y) auto auto var(--pane-x);width:var(--pane-w);height:var(--pane-h);}
+.support-radar{width:min(100%,32vh);height:auto;aspect-ratio:1;image-rendering:pixelated;touch-action:none;border:1px solid #826e91;}
+#game.segmented{--focus-x:calc(var(--pane-x) + var(--pane-w)*.5);--focus-y:calc(var(--pane-y) + var(--pane-h)*.55);}
+@media(pointer:coarse) and (orientation:portrait){
+  #interact{top:auto;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 70px);max-width:calc(100% - 216px);white-space:normal;line-height:1.15;}
+  .field-stack .stat,.field-stack .encounter,.field-stack #contract,.identity-label span{font-size:11px;}
+}
+
+.modal[data-screen="combat"] #dialog-detail {white-space:pre-line;line-height:1.75;}
+@media(pointer:coarse) and (orientation:landscape) and (min-height:521px){
+  #interact{top:auto;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 74px);}
+}
+@media(pointer:coarse) and (max-width:360px){
+  .hud .run-clock{left:56%;}
+  .field-stack .contract{width:max-content;max-width:65vw;}
+}
+@media(pointer:coarse){.field-stack .status{flex-wrap:wrap;}}
+#game.segmented :is(.run-clock,#interact,#card-reveal,.message){left:var(--focus-x);}
+#game.segmented .modal .dialog {max-height:100%;}
+#game input.room-code{user-select:text;-webkit-user-select:text;}
+@media(pointer:coarse){.modal button,.room-code{min-height:44px;}}

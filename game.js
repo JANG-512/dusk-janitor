@@ -21,6 +21,11 @@
     ring: { label: '정화의 파동', icon: 'M12 3l8 4 3 6-4 7-7 3-8-4-3-7 4-6zm0 5 4 2 2 3-2 4-4 2-4-2-2-4 2-3z', desc: '일정 간격으로 사방에 정화 파동을 퍼뜨립니다.' }
   };
   const utility = [
+    {key:'wildPocket',habit:true,label:'변덕 주머니',desc:'손패를 두 장 사용할 때마다 무작위 카드를 한 장 뽑습니다. 저주도 즉시 발동합니다.',icon:weaponData.soap.icon,max:1},
+    {key:'spotless',habit:true,label:'무결점 청소',desc:'체력이 가득 차면 주 무기 피해 +2. 방 정화로 체력을 회복할 수 없습니다.',icon:weaponData.soap.icon,max:1},
+    {key:'counting',habit:true,label:'세 번씩 쓸기',desc:'세 번째 공격 피해 +4. 앞선 두 번은 피해가 1씩 줄어듭니다(최소 1).',icon:weaponData.broom.icon,max:1},
+    {key:'collector',habit:true,label:'수집벽',desc:'손패 한 장마다 주 무기 피해 +1(최대 +3). 경험치 흡수 거리가 절반이 됩니다.',icon:weaponData.ring.icon,max:1},
+    {key:'rushwork',habit:true,label:'벼락 청소',desc:'회피 직후 1초 동안 주 무기 피해 +3. 회피 대기시간은 0.8초 늘어납니다.',icon:weaponData.spray.icon,max:1},
     { key: 'haste', label: '손놀림 연습', icon: 'M2 15h6m-3-4h5m-1-4h6m2-4-4 9h7l-8 10 3-9', desc: '주 무기의 재사용 대기시간과 자동 공격 주기가 12% 짧아집니다.', max: 3 },
     { key: 'magnet', label: '수거용 자석', icon: 'M3 4h6v10l3 3 3-3V4h6v10l-3 6-6 2-6-2-3-6zM3 8h6m6 0h6', desc: '멀리 있는 경험치까지 끌어당깁니다.', max: 3 },
     { key: 'heal', label: '따뜻한 차', icon: 'M4 9h12v7l-3 4H7l-3-4zm12 2h4v5h-4M7 6l2-4m3 4 2-4', desc: '최대 체력과 현재 체력이 1씩 증가합니다.', max: 4 }
@@ -135,6 +140,15 @@
   const focus = { x: 0, y: 0 };
   function resize() {
     const { clientWidth: w, clientHeight: h } = ui.game;
+    const segments=window.viewport?.segments;
+    const folded=segments?.length>1 && navigator.devicePosture?.type!=='continuous';
+    ui.game.classList.toggle('segmented',!!folded);
+    if(folded){
+      const seg=segments[0];
+      for(const [key,val] of Object.entries({x:seg.x,y:seg.y,w:seg.width,h:seg.height})){
+        ui.game.style.setProperty('--pane-'+key,val+'px');
+      }
+    }
     const zoom = clamp(Math.min(w, h) / 335, 1.55, 2.95) * settings.zoom / 100;
     canvas.width = Math.ceil(w / zoom);
     canvas.height = Math.ceil(h / zoom);
@@ -153,12 +167,13 @@
     });
     currentRoom = dungeon.rooms[0];
     if (!travel) {
+      supportReady=0;
       hero = {
         x: currentRoom.cx, y: currentRoom.cy + 22, hp: 6, max: 6, moving: false,
         facing: { x: 0, y: -1 }, invulnerable: 0, dash: 0, dashCooldown: 0
       };
       run = {
-        bossLevel: 0, cardKills: 0, time: 0, kills: 0, allies: 0, streak: 0, mercy: 0, clean: 0, id: 0,
+        pocketUses:0, teamwork:0, xpRemainder:0, hazardAt:12, dashBoostUntil:0, bossLevel: 0, cardKills: 0, time: 0, kills: 0, allies: 0, streak: 0, mercy: 0, clean: 0, id: 0,
         xp: 0, need: 7, level: 1, weapons: { broom: 1 }, bonus: {}, timers: {}, shake: 0,
         charges: [], blastKills: 0, mods: {}, safeJets: 0, swings: 0, shield: false, fieldAt: -1, fieldCooldown: 0, hints: 0
       };
@@ -237,7 +252,7 @@
     room.seen = true;
     room.spawned = 0;
     room.resolved = 0;
-    room.batchSize = room.id === 0 ? 8 : 6 + Math.min(4, room.tier);
+    room.batchSize = (room.id === 0 ? 8 : 6 + Math.min(4, room.tier)) + (hardMode ? 2 : 0);
     room.total = room.batches * room.batchSize;
     room.next = 0;
     if (!first) announce(room.theme.name + ' · 오염 무리 출현');
@@ -284,7 +299,7 @@
   function spawnBatch(room, bossLevel = 0) {
     if (!bossLevel) {
       room.spawned++;
-      room.next = room.id === 0 ? 8.5 : 7.2;
+      room.next = (room.id === 0 ? 8.5 : 7.2) * (hardMode ? .72 : 1);
     }
     const offset = Math.floor(Math.random() * room.cores.length);
     for (let i = 0; i < (bossLevel ? 1 : room.batchSize); i++) {
@@ -338,6 +353,7 @@
     if (run.weapons.spray) tools.push('분무기 '+remaining(run.timers.spray));
     if (run.weapons.ring) tools.push('파동 '+remaining(run.timers.ring));
     const specials = [];
+    if(crewSide==='host' && SweepRoom.connected()) specials.push('협력도 '+run.teamwork+'/5');
     if (role === 'sweeper') specials.push('깨끗한 바닥 '+run.polishKills+'/'+(6-talent(2)));
     if (role === 'alchemist') specials.push('모래바람 '+(18+4*talent(1))+'%');
     if (run.repairUntil > run.time) specials.push('호스 수리 '+remaining(run.repairUntil-run.time));
@@ -376,6 +392,24 @@
     {name:'가시 계약', kind:'저주', desc:'체력을 최대 2 소모하고 경험치 12를 얻습니다. 체력은 최소 1이 남습니다.', play(){hero.hp=Math.max(1,hero.hp-2);run.xp+=12;}},
     {name:'맑은 바람', kind:'축복', desc:'안개와 필드 반전을 해제하고 회피를 즉시 준비합니다.', play(){run.fogUntil=run.mirrorUntil=0;hero.dashCooldown=0;}}
   ];
+  function drawRewardCard(){
+    const id=Math.floor(Math.random()*deck.length);
+    const card=deck[id];
+    run.pendingReveals.push(id);
+    updateReveal();
+    if (card.kind==='저주') {
+      card.play();
+      run.curseNotice=card.name;
+      run.curseNoticeUntil=run.time+3;
+      burst(hero.x,hero.y-7,'#df86c5',18,46);
+      tone(230,100,.22);
+    } else {
+      run.hand.push(id);
+      tone(554,740,.09,'square');
+      tone(831,1109,.15,'triangle',.08);
+    }
+  }
+
   function updateReveal() {
     if (run.time < run.revealUntil) return;
     const panel = ui['card-reveal'];
@@ -415,6 +449,7 @@
         run.hand.splice(index,1);
         resume();
         card.play();
+        if(run.bonus.wildPocket && ++run.pocketUses%2===0) drawRewardCard();
         burst(hero.x,hero.y-8,'#ead6a9',18,45);
         updateHud();
         announce(card.name+' 사용',2.5);
@@ -630,10 +665,93 @@
   }
   document.addEventListener('pointerdown',unlockAudio,{once:true});
   document.addEventListener('keydown',unlockAudio,{once:true});
+  let crewSide='', lastBroadcast=0, supportReady=0;
+  let boardPanel=null;
+  function leaveCrew(){
+    SweepRoom.close();crewSide='';boardPanel=null;
+    ui['team-stat'].hidden=true;
+    if(run){run.teamwork=0;run.xpRemainder=0;}
+  }
+  function coopMenu(){
+    leaveCrew();
+    const input=document.createElement('input');
+    input.className='room-code';input.maxLength=8;input.autocomplete='off';input.placeholder='XXXXXXXX';input.setAttribute('aria-label',DuskLanguage.translate('방 코드'));
+    input.oninput=()=>{input.value=input.value.toUpperCase().replace(/[^A-Z2-9]/g,'');};
+    dialog('lobby','CO-OP','비공개 협동','현장 청소부가 탐험하고 지원 담당이 표적을 선택합니다. 같은 적을 2초 안에 함께 맞히면 협력도가 오릅니다.',[
+      action('방 만들기',()=>connectCrew('')),
+      action('코드로 입장',()=>{if(!/^[A-HJ-NP-Z2-9]{8}$/.test(input.value)){input.focus();input.setCustomValidity(DuskLanguage.translate('8자리 방 코드를 입력하세요.'));input.reportValidity();input.setCustomValidity('');return;}connectCrew(input.value);}),
+      action('뒤로',titleScreen,true)
+    ]);
+    ui['dialog-actions'].prepend(input);
+  }
+  function connectCrew(code){
+    crewSide=code?'guest':'host';
+    const quit=titleScreen;
+    dialog('lobby','CO-OP','연결 중','비공개 채널을 여는 중입니다.',[action('취소',quit,true)]);
+    SweepRoom.open(code,{
+      code(value){
+        const copy=action('코드 복사',async()=>{
+          try{await navigator.clipboard.writeText(value);DuskLanguage.bind(copy,'text','복사 완료');}
+          catch{DuskLanguage.bind(ui['dialog-detail'],'text','화면의 8자리 코드를 전달하세요.');}
+        });
+        dialog('lobby','ROOM CODE',value,'이 코드를 함께할 사람에게 전달하세요.',[copy,action('취소',quit,true)]);
+      },
+      ready(){
+        if(crewSide==='host'){hardMode=false;selectRole();}
+        else {dialog('support','CO-OP','원격 지원','방장이 캐릭터를 선택하고 있습니다.',[action('방 나가기',quit,true)]);
+          boardPanel=document.createElement('div');boardPanel.className='targets';ui['dialog-actions'].prepend(boardPanel);
+          const radar=document.createElement('canvas');radar.width=radar.height=360;radar.className='support-radar';
+          radar.setAttribute('aria-label',DuskLanguage.translate('지원 표적 지도'));boardPanel.before(radar);}
+      },
+      data(msg){
+        if(crewSide==='guest' && msg.kind==='board' && boardPanel && Array.isArray(msg.targets)){
+          SweepRoom.paintBoard(boardPanel.previousElementSibling,msg);
+          ui['dialog-detail'].textContent=msg.text;
+          const ids=new Set();
+          for(const t of msg.targets.slice(0,6)){
+            if(!Number.isInteger(t.id))continue;
+            const key=String(t.id);ids.add(key);
+            let button=[...boardPanel.children].find(b=>b.dataset.id===key);
+            if(!button){button=document.createElement('button');button.className='action secondary';button.dataset.id=key;boardPanel.append(button);}
+            button.textContent=t.text;button.onclick=()=>SweepRoom.send({kind:'strike',id:t.id,world:msg.world});
+          }
+          for(const b of [...boardPanel.children])if(!ids.has(b.dataset.id))b.remove();
+        }
+        if(crewSide==='host' && msg.kind==='strike' && mode==='playing' && msg.world===dungeon.seed && run.time>=supportReady){
+          const m=supportTargets().find(v=>v.id===msg.id);
+          if(!m)return;
+          supportReady=run.time+.65;
+          effects.push({kind:'bolt',x:m.x-10,y:m.y-32,toX:m.x,toY:m.y-4,life:.32,color:'#a5ecd8'});
+          damageMonster(m,1+Math.floor(run.level/8),hero,false,-1,'지원 사격');
+        }
+      },
+      end(reason){
+        const inField=crewSide==='host' && sessionStarted && !['lobby','roles','title'].includes(mode);
+        leaveCrew();
+        if(inField)announce(reason,4);
+        else dialog('lobby','CO-OP','협동 종료',reason,[action('다시 연결',coopMenu),action('타이틀로',titleScreen,true)]);
+      }
+    });
+  }
+  function supportTargets(){
+    return hostiles().filter(m=>distance(hero,m)<=160 && clearLine(hero,m)).sort((a,b)=>distance(hero,a)-distance(hero,b)).slice(0,6);
+  }
+  function broadcastCrew(now){
+    if(crewSide!=='host'||!SweepRoom.connected()||now-lastBroadcast<180)return;
+    lastBroadcast=now;
+    const targets=mode==='playing'?supportTargets().map(m=>({id:m.id,dx:Math.round(m.x-hero.x),dy:Math.round(m.y-hero.y),hp:m.hp,maxHp:m.maxHp,type:m.type,warden:m.warden,breed:m.breed,text:(m.bossLevel?'★ ':m.type===2?'◆ ':m.type===1?'◇ ':'● ')+(m.x<hero.x?'←':'→')+' #'+m.id+' · HP '+m.hp})): [];
+    ui['team-stat'].hidden=mode!=='playing';
+    ui['team-level'].textContent=run.teamwork+'/5';
+    const text=mode==='playing'?'Lv.'+run.level+' · XP '+run.xp+'/'+run.need+' · ♥ '+hero.hp+'/'+hero.max+' · '+DuskLanguage.translate('협력도')+' '+run.teamwork+'/5 · ATK +'+Math.floor(run.teamwork/2)+' · XP +'+(10*run.teamwork)+'%':DuskLanguage.translate('현장 대기 중');
+    SweepRoom.send({kind:'board',world:dungeon.seed,region:dungeon.regionIndex,x:hero.x,y:hero.y,time:run.time,role,text,targets});
+  }
+
   function titleScreen() {
+    leaveCrew();
     const buttons = [];
     if (sessionStarted) buttons.push(action('탐험 이어하기',resume));
     buttons.push(action(sessionStarted ? '새 탐험 준비' : '탐험 준비',()=>{hardMode=false;selectRole();}),action('설정',()=>settingsScreen(titleScreen),true));
+    buttons.push(action('비공개 협동',coopMenu,true));
     if (hardUnlocked) buttons.push(action('하드모드 탐험',()=>{hardMode=true;selectRole();}));
     dialog('title','OPERATION CLEAN SWEEP','쓱싹 대작전','달안개 마을의 마지막 야간 근무',buttons);
     const banner=document.createElement('canvas');
@@ -720,7 +838,7 @@
       button.append(portrait,name,desc);
       return button;
     });
-    dialog('roles','청소반 명부','캐릭터 선택',sessionStarted ? '선택하면 진행 중인 탐험을 끝내고 새 던전에서 시작합니다.' : '청소부를 선택하면 탐험이 시작됩니다.',[...cards,action('뒤로',titleScreen,true)]);
+    dialog('roles','청소반 명부','캐릭터 선택',hardMode ? '하드모드 · 증원과 추격이 빨라지고 발밑에 오염이 솟습니다. 세 방마다 체력을 회복합니다.' : sessionStarted ? '선택하면 진행 중인 탐험을 끝내고 새 던전에서 시작합니다.' : '청소부를 선택하면 탐험이 시작됩니다.',[...cards,action('뒤로',titleScreen,true)]);
   }
   function settingsScreen(back) {
     const groups = [
@@ -778,6 +896,8 @@
   });
   function showPauseMenu() {
     const buttons = [action('계속하기', resume), action('내 빌드',()=>buildBook(showPauseMenu),true), action('설정',()=>settingsScreen(showPauseMenu),true), action('타이틀로',titleScreen,true)];
+    if(document.fullscreenEnabled && matchMedia('(pointer:coarse) and (max-width:600px)').matches)
+      buttons.push(action('전체 화면',()=>ui.fullscreen.click(),true));
     let detail = '도구를 내려놓고 잠시 쉬어 갑니다.';
     if (!installed() && installPrompt) {
       buttons.push(action('홈 화면에 설치', async () => {
@@ -794,7 +914,7 @@
   }
 
   function togglePause() {
-    if (mode === 'paused') resume();
+    if (mode === 'paused' || mode === 'combat') resume();
     else if (mode === 'playing') {
       showPauseMenu();
     }
@@ -950,6 +1070,8 @@
     // On milestone levels, offer both branches so the player can deliberately specialize.
     if (run.level % 3 === 0 && specialty.length >= 2) options.push(specialty.find(item=>item!==options[0]));
     if (unowned.length) options.push(unowned[Math.floor(Math.random() * unowned.length)]);
+    const habits=utility.filter(v=>v.habit && !run.bonus[v.key]);
+    if(run.level%2===0 && habits.length)options.push(habits[Math.floor(Math.random()*habits.length)]);
     const upgrades=modules.filter(item=>(run.bonus[item.key]??0)<item.max);
     if(upgrades.length) options.push(upgrades[Math.floor(Math.random()*upgrades.length)]);
     while (options.length < 4 && available.some(item => !options.includes(item))) {
@@ -1037,10 +1159,11 @@
     for (const shot of shots) {
       if (shot.room === room) shot.life = 0;
     }
-    hero.hp = Math.min(hero.max, hero.hp + 1);
+    const heal=(!hardMode || run.clean%3===0) && !run.bonus.spotless;
+    if(heal) hero.hp=Math.min(hero.max,hero.hp+1);
     tone(392, 494, .17);
     tone(587, 785, .26, 'triangle', .11);
-    announce(run.clean === dungeon.rooms.length ? '모든 방 정화 완료' : room.theme.name + ' 정화 완료 · 체력 +1', 4);
+    announce(run.clean === dungeon.rooms.length ? '모든 방 정화 완료' : room.theme.name + (heal?' 정화 완료 · 체력 +1':' 정화 완료'), 4);
   }
 
   function placeGem(m) {
@@ -1107,6 +1230,15 @@
       effects.push({kind:'ring',x:m.x,y:m.y-6,radius:15,full:.3,life:.3,color:'#bde1eb'});
       return;
     }
+    if (crewSide==='host' && SweepRoom.connected() && (player || source==='지원 사격')) {
+      const hitBy=source==='지원 사격'?'support':'field';
+      if(m.hitBy && m.hitBy!==hitBy && run.time-m.teamHitAt<=2){
+        run.teamwork=Math.min(5,run.teamwork+1);
+        burst(m.x,m.y-10,'#a9efe1',8,30);
+      }
+      m.hitBy=hitBy;m.teamHitAt=run.time;
+      amount+=Math.floor(run.teamwork/2);
+    }
     const lostHp = Math.min(m.hp,amount);
     m.hp -= lostHp;
     m.flash = .15;
@@ -1136,21 +1268,7 @@
     }
     if (++run.cardKills >= cardInterval()) {
       run.cardKills = 0;
-      const id=Math.floor(Math.random()*deck.length);
-      const card=deck[id];
-      run.pendingReveals.push(id);
-      updateReveal();
-      if (card.kind==='저주') {
-        card.play();
-        run.curseNotice=card.name;
-        run.curseNoticeUntil=run.time+3;
-        burst(hero.x,hero.y-7,'#df86c5',18,46);
-        tone(230,100,.22);
-      } else {
-        run.hand.push(id);
-        tone(554,740,.09,'square');
-        tone(831,1109,.15,'triangle',.08);
-      }
+      drawRewardCard();
     }
     if (m.bossLevel) {
       run.bossLevel = 0;
@@ -1183,14 +1301,15 @@
     if (hero.dash > 0 || hero.invulnerable > 0 || mode !== 'playing') return;
     if (run.shield) {
       run.shield = false;
-      hero.invulnerable = .95;
+      hero.invulnerable = hardMode ? .62 : .95;
       burst(hero.x, hero.y-8, '#9debd9', 20, 57);
       announce('샘물 부적이 피해를 막았습니다');
       return;
     }
     hero.hp = Math.max(0, hero.hp - (1 + Math.floor((run.level - 1) / 25) + Number(hardMode)));
-    hero.invulnerable = .95;
+    hero.invulnerable = hardMode ? .62 : .95;
     run.streak = run.mercy = 0;
+    run.teamwork=Math.max(0,run.teamwork-1);
     run.shake = .25;
     burst(hero.x, hero.y - 7, '#f3819f', 14, 57);
     tone(135, 68, .24, 'sawtooth');
@@ -1273,6 +1392,10 @@
       if (!hit(m) || m.hp<=0 || m.fear>0) continue;
       const counter = role==='alchemist' && (m.windup>0 || m.rush>0);
       let damage=broom;
+      if(run.bonus.spotless && hero.hp===hero.max)damage+=2;
+      if(run.bonus.collector)damage+=Math.min(3,run.hand.length);
+      if(run.bonus.rushwork && run.time<run.dashBoostUntil)damage+=3;
+      if(run.bonus.counting)damage=Math.max(1,damage+(run.swings%3===0?4:-1));
       if (counter) damage+=1+talent(0);
       if (role==='sweeper' && m.slipUntil>run.time) damage+=partValue('edge');
       if (hose && run.swings%3===0) damage+=partValue('pump');
@@ -1488,7 +1611,7 @@
         y += dy / d * (12 - d) / 23;
       }
     }
-    const speed = ([38, 30, 44][m.type] + Math.min(13, m.room.tier * 3)) * (m.chilledUntil > run.time ? .45 : 1) * dt;
+    const speed = ([38, 30, 44][m.type] + Math.min(13, m.room.tier * 3)) * (m.chilledUntil > run.time ? .45 : 1) * (hardMode ? 1.18 : 1) * dt;
     move(m, x * speed, y * speed, 3);
   }
 
@@ -1496,7 +1619,8 @@
     if (mode !== 'playing' || hero.dashCooldown > 0) return;
     hero.dash = .2;
     circuitEvent('dash',hero);
-    hero.dashCooldown = .9;
+    hero.dashCooldown = run.bonus.rushwork ? 1.7 : .9;
+    run.dashBoostUntil=run.time+1;
     const aim = movementAim();
     hero.dashDirection = aim.x || aim.y ? vector(aim.x, aim.y) : hero.facing;
     burst(hero.x, hero.y - 4, '#c3b1f5', 13, 49);
@@ -1544,6 +1668,13 @@
     }
   }
 
+  function collectXp(value){
+    const boost=crewSide==='host' && SweepRoom.connected()?run.teamwork:0;
+    // Accumulate tenths so a single small crystal benefits from teamwork over time.
+    const tenths=value*(10+boost)+run.xpRemainder;
+    run.xp+=Math.floor(tenths/10);run.xpRemainder=tenths%10;
+  }
+
   function updateFallout(dt) {
     for (const shot of shots) {
       shot.x += shot.vx * dt;
@@ -1566,11 +1697,11 @@
       }
     }
     shots = shots.filter(s => s.life > 0);
-    const radius = 31 + 22 * (run.bonus.magnet ?? 0);
+    const radius = (31 + 22 * (run.bonus.magnet ?? 0)) * (run.bonus.collector ? .5 : 1);
     for (const gem of gems) {
       const range = distance(gem, hero);
       if (range < 10) {
-        run.xp += gem.value;
+        collectXp(gem.value);
         gem.value = 0;
         circuitEvent('gem',hero);
         burst(gem.x, gem.y, '#c0f6c7', 3, 24);
@@ -1594,6 +1725,9 @@
 
   function update(dt) {
     run.time += dt;
+    if(hardMode && run.time>=run.hazardAt && currentRoom.state==='active'){
+      arm(hero,26,1.2,0);run.hazardAt=run.time+Math.max(7,12-dungeon.regionIndex);
+    }
     run.slicks = run.slicks.filter(s=>s.until>run.time);
     updateReveal();
     run.shake = Math.max(0, run.shake - dt);
@@ -1635,7 +1769,7 @@
       }
     }
     if (!run.bossLevel && run.clean === dungeon.rooms.length) {
-      for (const gem of gems) run.xp += gem.value;
+      for (const gem of gems) collectXp(gem.value);
       newRun(undefined, true);
     }
     if (!run.bossLevel && run.xp >= run.need) levelUp();
@@ -1926,6 +2060,7 @@
   addEventListener('pagehide', resetInput);
   addEventListener('orientationchange', resetInput);
   addEventListener('resize', () => { resetInput(); resize(); });
+  navigator.devicePosture?.addEventListener?.('change',()=>{resetInput();resize();});
   new ResizeObserver(resize).observe(ui.game);
   for (const axis of ['horizontal', 'vertical']) {
     matchMedia('(' + axis + '-viewport-segments: 2)').addEventListener('change', resize);
@@ -2027,8 +2162,7 @@
 
   ui.game.tabIndex = -1;
   ui['combat-toggle'].onclick=()=>{
-    const open=ui.game.classList.toggle('combat-expanded');
-    ui['combat-toggle'].setAttribute('aria-expanded',String(open));
+    if(mode==='playing') dialog('combat',roles[role].name,'전투 정보',uiState.combatText || '',[action('닫기',resume)]);
   };
   ui.cards.addEventListener('click',openHand);
   ui.loadout.addEventListener('click',()=>{ if(mode==='playing') buildBook(); });
@@ -2068,6 +2202,7 @@
     if (mode === 'playing' && dt > 0) update(dt);
     SweepAudio.tick(settings,mode,run.bossLevel,dungeon.regionIndex);
     draw();
+    broadcastCrew(now);
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
